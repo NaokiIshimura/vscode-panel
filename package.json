@@ -81,6 +81,16 @@
         "command": "fileList.delete",
         "title": "削除",
         "icon": "$(trash)"
+      },
+      {
+        "command": "fileList.revealActiveFile",
+        "title": "現在のファイルを選択",
+        "icon": "$(target)"
+      },
+      {
+        "command": "fileList.toggleAutoReveal",
+        "title": "自動ファイル選択の切り替え",
+        "icon": "$(eye)"
       }
     ],
     "views": {
@@ -152,6 +162,16 @@
         {
           "command": "fileList.refreshGitChanges",
           "when": "view == gitChanges",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.revealActiveFile",
+          "when": "view == workspaceExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.toggleAutoReveal",
+          "when": "view == workspaceExplorer",
           "group": "navigation"
         }
       ],
