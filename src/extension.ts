@@ -66,6 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: true
     });
 
+
     const treeView = vscode.window.createTreeView('fileListExplorer', {
         treeDataProvider: fileListProvider,
         showCollapseAll: true
@@ -91,6 +92,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 初期化を実行
     initializeWithWorkspaceRoot();
+
 
     // 初期化後にルートフォルダを選択状態にする
     setTimeout(async () => {
@@ -365,7 +367,102 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand, createFolderCommand);
+    // リネームコマンドを登録
+    const renameCommand = vscode.commands.registerCommand('fileList.rename', async (item: FileItem) => {
+        if (!item) {
+            vscode.window.showErrorMessage('項目が選択されていません');
+            return;
+        }
+
+        const oldName = path.basename(item.filePath);
+        const dirPath = path.dirname(item.filePath);
+
+        // 新しい名前の入力を求める
+        const newName = await vscode.window.showInputBox({
+            prompt: '新しい名前を入力してください',
+            value: oldName,
+            validateInput: (value) => {
+                if (!value || value.trim() === '') {
+                    return '名前を入力してください';
+                }
+                // 不正な文字をチェック
+                if (value.match(/[<>:"|?*\/\\]/)) {
+                    return '使用できない文字が含まれています: < > : " | ? * / \\';
+                }
+                // 同じ名前の場合
+                if (value === oldName) {
+                    return '同じ名前です';
+                }
+                return null;
+            }
+        });
+
+        if (!newName) {
+            return;
+        }
+
+        const newPath = path.join(dirPath, newName);
+
+        try {
+            // 既に存在するかチェック
+            if (fs.existsSync(newPath)) {
+                vscode.window.showErrorMessage(`${newName} は既に存在します`);
+                return;
+            }
+
+            // リネーム実行
+            fs.renameSync(item.filePath, newPath);
+
+            // ビューを更新
+            fileDetailsProvider.refresh();
+
+            vscode.window.showInformationMessage(`${oldName} を ${newName} に変更しました`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`名前の変更に失敗しました: ${error}`);
+        }
+    });
+
+    // 削除コマンドを登録
+    const deleteCommand = vscode.commands.registerCommand('fileList.delete', async (item: FileItem) => {
+        if (!item) {
+            vscode.window.showErrorMessage('項目が選択されていません');
+            return;
+        }
+
+        const itemName = path.basename(item.filePath);
+        const itemType = item.isDirectory ? 'フォルダ' : 'ファイル';
+
+        // 確認ダイアログを表示
+        const answer = await vscode.window.showWarningMessage(
+            `${itemType} "${itemName}" を削除してもよろしいですか？\nこの操作は元に戻せません。`,
+            'はい',
+            'いいえ'
+        );
+
+        if (answer !== 'はい') {
+            return;
+        }
+
+        try {
+            // 削除実行
+            if (item.isDirectory) {
+                // フォルダの場合は再帰的に削除
+                fs.rmSync(item.filePath, { recursive: true, force: true });
+            } else {
+                // ファイルの場合
+                fs.unlinkSync(item.filePath);
+            }
+
+            // ビューを更新
+            fileDetailsProvider.refresh();
+
+            vscode.window.showInformationMessage(`${itemType} "${itemName}" を削除しました`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`削除に失敗しました: ${error}`);
+        }
+    });
+
+    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand, createFolderCommand, renameCommand, deleteCommand);
 
     // FileDetailsProviderのリソースクリーンアップを登録
     context.subscriptions.push({
@@ -1151,14 +1248,15 @@ class WorkspaceExplorerProvider implements vscode.TreeDataProvider<FileItem> {
                         ? vscode.TreeItemCollapsibleState.Collapsed
                         : vscode.TreeItemCollapsibleState.None;
 
-                    items.push(new FileItem(
+                    const item = new FileItem(
                         file,
                         collapsibleState,
                         filePath,
                         isDirectory,
                         stat.size || 0,
                         stat.mtime || new Date()
-                    ));
+                    );
+                    items.push(item);
                 } catch (error) {
                     console.error(`ファイル情報の取得に失敗: ${filePath}`, error);
                 }

@@ -71,6 +71,16 @@
         "command": "fileList.createFolder",
         "title": "フォルダを作成",
         "icon": "$(new-folder)"
+      },
+      {
+        "command": "fileList.rename",
+        "title": "名前の変更...",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "fileList.delete",
+        "title": "削除",
+        "icon": "$(trash)"
       }
     ],
     "views": {
@@ -160,6 +170,16 @@
           "command": "fileList.createMemo",
           "when": "view == fileListDetails && viewItem == directory",
           "group": "2_workspace"
+        },
+        {
+          "command": "fileList.rename",
+          "when": "view == fileListDetails",
+          "group": "3_edit@1"
+        },
+        {
+          "command": "fileList.delete",
+          "when": "view == fileListDetails",
+          "group": "3_edit@2"
         }
       ]
     }
