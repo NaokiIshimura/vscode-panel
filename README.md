@@ -54,6 +54,30 @@ npm run compile
 npm run watch
 ```
 
+## デバッグ方法
+
+### 準備
+1. 依存関係をインストール: `npm install`
+2. TypeScriptをコンパイル: `npm run compile`
+
+### デバッグの開始
+
+#### コマンドパレットから起動（推奨）
+1. `Ctrl+Shift+P` (Windows/Linux) または `Cmd+Shift+P` (Mac) でコマンドパレットを開く
+2. 「Debug: Start Debugging」と入力して選択
+3. Enterキーを押して実行
+
+#### その他の起動方法
+- **F5キー**: デバッグを即座に開始
+- **デバッグパネル**: サイドバーの実行とデバッグアイコン → 「Run Extension」を選択 → 緑の▶️ボタンをクリック
+- **メニューバー**: 「実行」→「デバッグの開始」を選択
+
+### デバッグ中の操作
+- 新しいVSCodeウィンドウ（Extension Development Host）が開く
+- アクティビティバーに「File List」アイコンが表示される
+- ブレークポイントの設定、変数の検査、ステップ実行が可能
+- `Ctrl+R` / `Cmd+R` で拡張機能をリロード
+
 ## インストール
 
 ### 方法1: 開発モード（テスト用）

@@ -7,6 +7,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('File List Extension が有効化されました');
 
     // TreeDataProviderを作成
+    const workspaceExplorerProvider = new WorkspaceExplorerProvider();
     const fileListProvider = new FileListProvider();
     const fileDetailsProvider = new FileDetailsProvider();
     const gitChangesProvider = new GitChangesProvider();
@@ -60,10 +61,18 @@ export function activate(context: vscode.ExtensionContext) {
     };
 
     // ビューを登録
+    const workspaceView = vscode.window.createTreeView('workspaceExplorer', {
+        treeDataProvider: workspaceExplorerProvider,
+        showCollapseAll: true
+    });
+
     const treeView = vscode.window.createTreeView('fileListExplorer', {
         treeDataProvider: fileListProvider,
         showCollapseAll: true
     });
+
+    // TreeViewをProviderに設定
+    fileListProvider.setTreeView(treeView);
 
     const detailsView = vscode.window.createTreeView('fileListDetails', {
         treeDataProvider: fileDetailsProvider,
@@ -258,12 +267,26 @@ export function activate(context: vscode.ExtensionContext) {
         gitChangesProvider.refresh();
     });
 
-    // メモファイルを作成するコマンドを登録
-    const createMemoCommand = vscode.commands.registerCommand('fileList.createMemo', async () => {
-        const currentPath = fileDetailsProvider.getCurrentPath();
-        if (!currentPath) {
-            vscode.window.showErrorMessage('フォルダが選択されていません');
-            return;
+    // ファイルを作成するコマンドを登録
+    const createMemoCommand = vscode.commands.registerCommand('fileList.createMemo', async (item?: FileItem) => {
+        // TreeViewで選択されたアイテムがある場合、その情報を使用
+        let targetPath: string;
+
+        if (item) {
+            // 選択されたアイテムがディレクトリの場合はそのパス、ファイルの場合は親ディレクトリ
+            if (item.isDirectory) {
+                targetPath = item.filePath;
+            } else {
+                targetPath = path.dirname(item.filePath);
+            }
+        } else {
+            // アイテムが渡されない場合は現在のパスを使用
+            const currentPath = fileDetailsProvider.getCurrentPath();
+            if (!currentPath) {
+                vscode.window.showErrorMessage('フォルダが選択されていません');
+                return;
+            }
+            targetPath = currentPath;
         }
 
         // 現在の日時を YYYYMMDDHHMM 形式で取得
@@ -273,10 +296,11 @@ export function activate(context: vscode.ExtensionContext) {
         const day = String(now.getDate()).padStart(2, '0');
         const hour = String(now.getHours()).padStart(2, '0');
         const minute = String(now.getMinutes()).padStart(2, '0');
-        
-        const timestamp = `${year}${month}${day}${hour}${minute}`;
-        const fileName = `${timestamp}_memo.md`;
-        const filePath = path.join(currentPath, fileName);
+        const second = String(now.getSeconds()).padStart(2, '0');
+
+        const timestamp = `${year}${month}${day}${hour}${minute}${second}`;
+        const fileName = `${timestamp}.md`;
+        const filePath = path.join(targetPath, fileName);
 
         try {
             // ファイルが既に存在するかチェック
@@ -286,7 +310,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             // 空のメモファイルを作成
-            const defaultContent = `# メモ (${timestamp})\n\n作成日時: ${now.toLocaleString('ja-JP')}\n\n---\n\n`;
+            const defaultContent = `作成日時: ${now.toLocaleString('ja-JP')}\n\n---\n\n\n`;
             fs.writeFileSync(filePath, defaultContent, 'utf8');
 
             // ファイル一覧を更新
@@ -302,7 +326,46 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand);
+    // フォルダを作成するコマンドを登録
+    const createFolderCommand = vscode.commands.registerCommand('fileList.createFolder', async () => {
+        const currentPath = fileDetailsProvider.getCurrentPath();
+        if (!currentPath) {
+            vscode.window.showErrorMessage('フォルダが選択されていません');
+            return;
+        }
+
+        // 現在の日時を YYYYMMDDhhmmss 形式で取得
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        const second = String(now.getSeconds()).padStart(2, '0');
+
+        const folderName = `${year}${month}${day}${hour}${minute}${second}`;
+        const folderPath = path.join(currentPath, folderName);
+
+        try {
+            // フォルダが既に存在するかチェック
+            if (fs.existsSync(folderPath)) {
+                vscode.window.showErrorMessage(`フォルダ ${folderName} は既に存在します`);
+                return;
+            }
+
+            // フォルダを作成
+            fs.mkdirSync(folderPath, { recursive: true });
+
+            // ファイル一覧を更新
+            fileDetailsProvider.refresh();
+
+            vscode.window.showInformationMessage(`フォルダ ${folderName} を作成しました`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`フォルダの作成に失敗しました: ${error}`);
+        }
+    });
+
+    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand, createFolderCommand);
 
     // FileDetailsProviderのリソースクリーンアップを登録
     context.subscriptions.push({
@@ -394,12 +457,25 @@ class FileListProvider implements vscode.TreeDataProvider<FileItem> {
     readonly onDidChangeTreeData: vscode.Event<FileItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private rootPath: string | undefined;
+    private treeView: vscode.TreeView<FileItem> | undefined;
 
     constructor() { }
 
+    setTreeView(treeView: vscode.TreeView<FileItem>): void {
+        this.treeView = treeView;
+    }
+
     setRootPath(path: string): void {
         this.rootPath = path;
+        this.updateTitle();
         this.refresh();
+    }
+
+    private updateTitle(): void {
+        if (this.treeView && this.rootPath) {
+            const folderName = path.basename(this.rootPath);
+            this.treeView.title = `フォルダツリー - ${folderName}`;
+        }
     }
 
     getRootPath(): string | undefined {
@@ -1019,6 +1095,87 @@ interface GitChange {
     path: string;
     relativePath: string;
     status: string;
+}
+
+// ワークスペースエクスプローラープロバイダー
+class WorkspaceExplorerProvider implements vscode.TreeDataProvider<FileItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<FileItem | undefined | null | void> = new vscode.EventEmitter<FileItem | undefined | null | void>();
+    readonly onDidChangeTreeData: vscode.Event<FileItem | undefined | null | void> = this._onDidChangeTreeData.event;
+
+    constructor() {}
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire();
+    }
+
+    getTreeItem(element: FileItem): vscode.TreeItem {
+        return element;
+    }
+
+    getChildren(element?: FileItem): Thenable<FileItem[]> {
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            return Promise.resolve([]);
+        }
+
+        // ルート要素の場合、ワークスペースフォルダのルートを返す
+        if (!element) {
+            const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+            const rootName = path.basename(workspaceRoot);
+            const rootItem = new FileItem(
+                rootName,
+                vscode.TreeItemCollapsibleState.Expanded,
+                workspaceRoot,
+                true,
+                0,
+                new Date()
+            );
+            return Promise.resolve([rootItem]);
+        }
+
+        // 選択された要素のサブアイテムを返す
+        const targetPath = element.resourceUri!.fsPath;
+        return this.getFileItems(targetPath);
+    }
+
+    private async getFileItems(dirPath: string): Promise<FileItem[]> {
+        try {
+            const files = await fs.promises.readdir(dirPath);
+            const items: FileItem[] = [];
+
+            for (const file of files) {
+                const filePath = path.join(dirPath, file);
+                try {
+                    const stat = await fs.promises.stat(filePath);
+                    const isDirectory = stat.isDirectory();
+                    const collapsibleState = isDirectory
+                        ? vscode.TreeItemCollapsibleState.Collapsed
+                        : vscode.TreeItemCollapsibleState.None;
+
+                    items.push(new FileItem(
+                        file,
+                        collapsibleState,
+                        filePath,
+                        isDirectory,
+                        stat.size || 0,
+                        stat.mtime || new Date()
+                    ));
+                } catch (error) {
+                    console.error(`ファイル情報の取得に失敗: ${filePath}`, error);
+                }
+            }
+
+            // ディレクトリを先に、その後ファイルをアルファベット順にソート
+            return items.sort((a, b) => {
+                if (a.isDirectory !== b.isDirectory) {
+                    return a.isDirectory ? -1 : 1;
+                }
+                return a.label!.toString().localeCompare(b.label!.toString());
+            });
+        } catch (error) {
+            console.error(`ディレクトリ読み取りエラー: ${dirPath}`, error);
+            return [];
+        }
+    }
 }
 
 // GitのHEADバージョンのコンテンツプロバイダー
