@@ -66,6 +66,22 @@ export function activate(context: vscode.ExtensionContext) {
         showCollapseAll: true
     });
 
+    // TreeViewをProviderに設定
+    workspaceExplorerProvider.setTreeView(workspaceView);
+
+    // アクティブエディタの変更を監視
+    vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        workspaceExplorerProvider.updateTitle(editor);
+        await workspaceExplorerProvider.revealActiveFile(editor);
+    });
+
+    // 初期タイトルを設定と初期ファイルの選択
+    workspaceExplorerProvider.updateTitle(vscode.window.activeTextEditor);
+    if (vscode.window.activeTextEditor) {
+        setTimeout(async () => {
+            await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
+        }, 500);
+    }
 
     const treeView = vscode.window.createTreeView('fileListExplorer', {
         treeDataProvider: fileListProvider,
@@ -1198,15 +1214,137 @@ interface GitChange {
 class WorkspaceExplorerProvider implements vscode.TreeDataProvider<FileItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<FileItem | undefined | null | void> = new vscode.EventEmitter<FileItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<FileItem | undefined | null | void> = this._onDidChangeTreeData.event;
+    private treeView: vscode.TreeView<FileItem> | undefined;
+    private itemCache: Map<string, FileItem> = new Map();  // パスをキーとしたFileItemのキャッシュ
 
     constructor() {}
 
+    setTreeView(treeView: vscode.TreeView<FileItem>): void {
+        this.treeView = treeView;
+    }
+
+    updateTitle(editor: vscode.TextEditor | undefined): void {
+        if (this.treeView) {
+            if (editor) {
+                const fileName = path.basename(editor.document.fileName);
+                this.treeView.title = `エクスプローラー - ${fileName}`;
+            } else {
+                this.treeView.title = 'エクスプローラー';
+            }
+        }
+    }
+
+    async revealActiveFile(editor: vscode.TextEditor | undefined): Promise<void> {
+        if (!this.treeView || !editor) {
+            return;
+        }
+
+        const filePath = editor.document.fileName;
+
+        // ワークスペース内のファイルかチェック
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            return;
+        }
+
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+
+        // ファイルがワークスペース内にあることを確認
+        if (!filePath.startsWith(workspaceRoot)) {
+            return;
+        }
+
+        try {
+            // ファイルに対応するFileItemを取得または作成
+            const fileItem = await this.findOrCreateFileItem(filePath);
+
+            if (fileItem) {
+                // ファイルを表示して選択（親フォルダも自動展開される）
+                // focus: falseでTreeViewにフォーカスを移さない
+                await this.treeView.reveal(fileItem, {
+                    select: true,      // アイテムを選択状態にする
+                    focus: false,      // TreeViewにフォーカスを移さない（エディタのフォーカスを保持）
+                    expand: true       // 親フォルダを展開する
+                });
+            }
+        } catch (error) {
+            console.log('ファイルの選択に失敗しました:', error);
+        }
+    }
+
+    private async findOrCreateFileItem(filePath: string): Promise<FileItem | undefined> {
+        // キャッシュから検索
+        if (this.itemCache.has(filePath)) {
+            return this.itemCache.get(filePath);
+        }
+
+        // パスの各階層を構築
+        const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+        const relativePath = path.relative(workspaceRoot, filePath);
+        const pathParts = relativePath.split(path.sep);
+
+        let currentPath = workspaceRoot;
+        let parentItem: FileItem | undefined;
+
+        // ルートから順番に各階層のアイテムを取得または作成
+        for (let i = 0; i <= pathParts.length; i++) {
+            if (i === 0) {
+                // ルートアイテムを取得
+                const children = await this.getChildren();
+                if (children.length > 0) {
+                    parentItem = children[0];
+                    this.itemCache.set(currentPath, parentItem);
+                }
+            } else {
+                const part = pathParts[i - 1];
+                currentPath = path.join(currentPath, part);
+
+                // 既にキャッシュにある場合はそれを使用
+                if (this.itemCache.has(currentPath)) {
+                    parentItem = this.itemCache.get(currentPath);
+                } else if (parentItem) {
+                    // 親要素の子要素を取得
+                    const children = await this.getChildren(parentItem);
+                    const childItem = children.find(child => child.filePath === currentPath);
+                    if (childItem) {
+                        this.itemCache.set(currentPath, childItem);
+                        parentItem = childItem;
+                    }
+                }
+            }
+        }
+
+        return this.itemCache.get(filePath);
+    }
+
     refresh(): void {
+        this.itemCache.clear();  // キャッシュをクリア
         this._onDidChangeTreeData.fire();
     }
 
     getTreeItem(element: FileItem): vscode.TreeItem {
         return element;
+    }
+
+    // 親要素を取得するメソッド（TreeViewのreveal機能に必要）
+    getParent(element: FileItem): vscode.ProviderResult<FileItem> {
+        const elementPath = element.filePath;
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+
+        if (!workspaceRoot || elementPath === workspaceRoot) {
+            // ルート要素の場合は親なし
+            return undefined;
+        }
+
+        const parentPath = path.dirname(elementPath);
+
+        // 親がワークスペースルートの場合
+        if (parentPath === workspaceRoot) {
+            // ルートアイテムを返す（キャッシュから取得）
+            return this.itemCache.get(workspaceRoot) || undefined;
+        }
+
+        // キャッシュから親要素を取得
+        return this.itemCache.get(parentPath) || undefined;
     }
 
     getChildren(element?: FileItem): Thenable<FileItem[]> {
@@ -1226,6 +1364,8 @@ class WorkspaceExplorerProvider implements vscode.TreeDataProvider<FileItem> {
                 0,
                 new Date()
             );
+            // ルートアイテムをキャッシュに保存
+            this.itemCache.set(workspaceRoot, rootItem);
             return Promise.resolve([rootItem]);
         }
 
@@ -1256,6 +1396,8 @@ class WorkspaceExplorerProvider implements vscode.TreeDataProvider<FileItem> {
                         stat.size || 0,
                         stat.mtime || new Date()
                     );
+                    // アイテムをキャッシュに保存
+                    this.itemCache.set(filePath, item);
                     items.push(item);
                 } catch (error) {
                     console.error(`ファイル情報の取得に失敗: ${filePath}`, error);
