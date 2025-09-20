@@ -15,7 +15,6 @@
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-
       {
         "command": "fileList.selectFolder",
         "title": "フォルダを選択",
@@ -28,8 +27,8 @@
       },
       {
         "command": "fileList.showInPanel",
-        "title": "下ペインに表示",
-        "icon": "$(split-horizontal)"
+        "title": "ファイル一覧に表示",
+        "icon": "$(list-tree)"
       },
       {
         "command": "fileList.openFolder",
@@ -62,6 +61,11 @@
         "command": "fileList.refreshGitChanges",
         "title": "Git変更を更新",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "fileList.createMemo",
+        "title": "メモファイルを作成",
+        "icon": "$(new-file)"
       }
     ],
     "views": {
@@ -85,7 +89,7 @@
         {
           "id": "fileListView",
           "title": "File List",
-          "icon": "$(files)"
+          "icon": "$(split-vertical)"
         }
       ]
     },
@@ -113,6 +117,11 @@
         },
         {
           "command": "fileList.goToParent",
+          "when": "view == fileListDetails",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.createMemo",
           "when": "view == fileListDetails",
           "group": "navigation"
         },

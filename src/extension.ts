@@ -258,7 +258,56 @@ export function activate(context: vscode.ExtensionContext) {
         gitChangesProvider.refresh();
     });
 
-    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand);
+    // メモファイルを作成するコマンドを登録
+    const createMemoCommand = vscode.commands.registerCommand('fileList.createMemo', async () => {
+        const currentPath = fileDetailsProvider.getCurrentPath();
+        if (!currentPath) {
+            vscode.window.showErrorMessage('フォルダが選択されていません');
+            return;
+        }
+
+        // 現在の日時を YYYYMMDDHHMM 形式で取得
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hour = String(now.getHours()).padStart(2, '0');
+        const minute = String(now.getMinutes()).padStart(2, '0');
+        
+        const timestamp = `${year}${month}${day}${hour}${minute}`;
+        const fileName = `${timestamp}_memo.md`;
+        const filePath = path.join(currentPath, fileName);
+
+        try {
+            // ファイルが既に存在するかチェック
+            if (fs.existsSync(filePath)) {
+                vscode.window.showErrorMessage(`ファイル ${fileName} は既に存在します`);
+                return;
+            }
+
+            // 空のメモファイルを作成
+            const defaultContent = `# メモ (${timestamp})\n\n作成日時: ${now.toLocaleString('ja-JP')}\n\n---\n\n`;
+            fs.writeFileSync(filePath, defaultContent, 'utf8');
+
+            // ファイル一覧を更新
+            fileDetailsProvider.refresh();
+
+            // 作成したファイルを開く
+            const document = await vscode.workspace.openTextDocument(filePath);
+            await vscode.window.showTextDocument(document);
+
+            vscode.window.showInformationMessage(`メモファイル ${fileName} を作成しました`);
+        } catch (error) {
+            vscode.window.showErrorMessage(`メモファイルの作成に失敗しました: ${error}`);
+        }
+    });
+
+    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand);
+
+    // FileDetailsProviderのリソースクリーンアップを登録
+    context.subscriptions.push({
+        dispose: () => fileDetailsProvider.dispose()
+    });
 }
 
 // 初期フォルダを選択する関数
@@ -431,6 +480,7 @@ class FileDetailsProvider implements vscode.TreeDataProvider<FileItem> {
     private rootPath: string | undefined;
     private projectRootPath: string | undefined;
     private treeView: vscode.TreeView<FileItem> | undefined;
+    private fileWatcher: vscode.FileSystemWatcher | undefined;
 
     constructor() {
         // プロジェクトルートパスを取得
@@ -452,6 +502,7 @@ class FileDetailsProvider implements vscode.TreeDataProvider<FileItem> {
     setRootPath(path: string): void {
         this.rootPath = path;
         this.updateTitle();
+        this.setupFileWatcher();
         this.refresh();
     }
 
@@ -482,6 +533,44 @@ class FileDetailsProvider implements vscode.TreeDataProvider<FileItem> {
         }
 
         this.setRootPath(parentPath);
+    }
+
+    getCurrentPath(): string | undefined {
+        return this.rootPath;
+    }
+
+    private setupFileWatcher(): void {
+        // 既存のウォッチャーを破棄
+        if (this.fileWatcher) {
+            this.fileWatcher.dispose();
+            this.fileWatcher = undefined;
+        }
+
+        // 新しいウォッチャーを設定（現在のパス配下を監視）
+        if (this.rootPath) {
+            const watchPattern = new vscode.RelativePattern(this.rootPath, '**/*');
+            this.fileWatcher = vscode.workspace.createFileSystemWatcher(watchPattern);
+
+            // ファイル・フォルダの変更を監視して自動更新
+            this.fileWatcher.onDidChange(() => {
+                this.refresh();
+            });
+
+            this.fileWatcher.onDidCreate(() => {
+                this.refresh();
+            });
+
+            this.fileWatcher.onDidDelete(() => {
+                this.refresh();
+            });
+        }
+    }
+
+    dispose(): void {
+        if (this.fileWatcher) {
+            this.fileWatcher.dispose();
+            this.fileWatcher = undefined;
+        }
     }
 
     refresh(): void {
