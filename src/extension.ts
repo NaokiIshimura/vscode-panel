@@ -70,29 +70,11 @@ export function activate(context: vscode.ExtensionContext) {
     workspaceExplorerProvider.setTreeView(workspaceView);
 
     // アクティブエディタの変更を監視
-    // TreeViewの可視性変更を監視
-    workspaceView.onDidChangeVisibility(async () => {
-        if (workspaceView.visible) {
-            // TreeViewが表示された（フォーカスされた）
-            console.log('エクスプローラーペインがフォーカスされました');
-
-            // 現在のファイルを選択
-            if (vscode.window.activeTextEditor) {
-                await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
-            }
-        } else {
-            // TreeViewが非表示になった（フォーカスが外れた）
-            console.log('エクスプローラーペインのフォーカスが外れました');
-        }
-    });
-
     vscode.window.onDidChangeActiveTextEditor(async (editor) => {
         workspaceExplorerProvider.updateTitle(editor);
 
-        // TreeViewが可視の場合のみ実行
-        if (workspaceView.visible) {
-            await workspaceExplorerProvider.revealActiveFile(editor);
-        }
+        // 常に自動選択を実行
+        await workspaceExplorerProvider.revealActiveFile(editor);
     });
 
     // 初期タイトルを設定
