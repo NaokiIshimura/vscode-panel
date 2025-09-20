@@ -1,0 +1,138 @@
+{
+  "name": "file-list-extension",
+  "displayName": "File List Extension",
+  "description": "指定したディレクトリ内のファイルを一覧表示するVSCode拡張機能",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+
+      {
+        "command": "fileList.selectFolder",
+        "title": "フォルダを選択",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "fileList.refresh",
+        "title": "更新",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "fileList.showInPanel",
+        "title": "下ペインに表示",
+        "icon": "$(split-horizontal)"
+      },
+      {
+        "command": "fileList.openFolder",
+        "title": "フォルダを開く"
+      },
+      {
+        "command": "fileList.goToParent",
+        "title": "親フォルダへ移動",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "fileList.setRelativePath",
+        "title": "相対パスを設定",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "fileList.openSettings",
+        "title": "設定を開く",
+        "icon": "$(settings-gear)"
+      }
+    ],
+    "views": {
+      "fileListView": [
+        {
+          "id": "fileListExplorer",
+          "name": "フォルダツリー"
+        },
+        {
+          "id": "fileListDetails",
+          "name": "ファイル一覧"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "fileListView",
+          "title": "File List",
+          "icon": "$(files)"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "fileList.selectFolder",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.refresh",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.setRelativePath",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.openSettings",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.goToParent",
+          "when": "view == fileListDetails",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "fileList.showInPanel",
+          "when": "view == fileListExplorer && viewItem == directory",
+          "group": "inline"
+        },
+        {
+          "command": "fileList.showInPanel",
+          "when": "view == fileListDetails && viewItem == directory",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "configuration": {
+    "title": "File List Extension",
+    "properties": {
+      "fileListExtension.defaultRelativePath": {
+        "type": "string",
+        "default": "",
+        "description": "フォルダツリーのデフォルト相対パス",
+        "markdownDescription": "ワークスペースルートからの相対パスを指定します。\n\n**設定方法:**\n1. 拡張機能の編集ボタンから設定\n2. この設定を直接編集\n3. `.vscode/settings.json` に手動で記入\n\n**例:**\n- `src` → プロジェクト/src\n- `docs/api` → プロジェクト/docs/api\n- `.claude` → プロジェクト/.claude\n- 空文字 → プロジェクトルート\n\n**手動設定例:**\n```json\n{\n  \"fileListExtension.defaultRelativePath\": \".claude\"\n}\n```"
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "typescript": "^4.9.4"
+  }
+}
