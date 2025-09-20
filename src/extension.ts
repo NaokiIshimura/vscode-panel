@@ -70,60 +70,36 @@ export function activate(context: vscode.ExtensionContext) {
     workspaceExplorerProvider.setTreeView(workspaceView);
 
     // アクティブエディタの変更を監視
-    let isAutoRevealEnabled = true; // 自動reveal機能をデフォルトでON
-    let isManuallyToggled = false; // ユーザーが手動でトグルしたかどうか
-    let isTreeViewVisible = true; // TreeViewが可視状態かどうか（初期値をtrueに）
-
     // TreeViewの可視性変更を監視
     workspaceView.onDidChangeVisibility(async () => {
-        isTreeViewVisible = workspaceView.visible;
+        if (workspaceView.visible) {
+            // TreeViewが表示された（フォーカスされた）
+            console.log('エクスプローラーペインがフォーカスされました');
 
-        // ユーザーが手動でトグルしていない場合のみ自動制御
-        if (!isManuallyToggled) {
-            const previousState = isAutoRevealEnabled;
-
-            if (workspaceView.visible) {
-                // TreeViewが表示された（フォーカスされた）
-                isAutoRevealEnabled = true;
-
-                // 状態が変わった場合のみ通知
-                if (!previousState) {
-                    console.log('エクスプローラーペインがフォーカスされました - 自動選択ON');
-                }
-
-                // 現在のファイルを選択
-                if (vscode.window.activeTextEditor) {
-                    await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
-                }
-            } else {
-                // TreeViewが非表示になった（フォーカスが外れた）
-                isAutoRevealEnabled = false;
-
-                // 状態が変わった場合のみ通知
-                if (previousState) {
-                    console.log('エクスプローラーペインのフォーカスが外れました - 自動選択OFF');
-                }
+            // 現在のファイルを選択
+            if (vscode.window.activeTextEditor) {
+                await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
             }
-
-            // タイトルを更新
-            workspaceExplorerProvider.updateTitle(vscode.window.activeTextEditor, isAutoRevealEnabled);
+        } else {
+            // TreeViewが非表示になった（フォーカスが外れた）
+            console.log('エクスプローラーペインのフォーカスが外れました');
         }
     });
 
     vscode.window.onDidChangeActiveTextEditor(async (editor) => {
-        workspaceExplorerProvider.updateTitle(editor, isAutoRevealEnabled);
+        workspaceExplorerProvider.updateTitle(editor);
 
-        // 自動reveal機能が有効かつTreeViewが可視の場合のみ実行
-        if (isAutoRevealEnabled && isTreeViewVisible) {
+        // TreeViewが可視の場合のみ実行
+        if (workspaceView.visible) {
             await workspaceExplorerProvider.revealActiveFile(editor);
         }
     });
 
     // 初期タイトルを設定
-    workspaceExplorerProvider.updateTitle(vscode.window.activeTextEditor, isAutoRevealEnabled);
+    workspaceExplorerProvider.updateTitle(vscode.window.activeTextEditor);
 
-    // 初期ファイルの選択（自動reveal機能が有効な場合のみ）
-    if (isAutoRevealEnabled && vscode.window.activeTextEditor) {
+    // 初期ファイルの選択
+    if (vscode.window.activeTextEditor) {
         setTimeout(async () => {
             await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
         }, 500);
@@ -524,25 +500,8 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // 自動reveal機能のトグルコマンドを登録
-    const toggleAutoRevealCommand = vscode.commands.registerCommand('fileList.toggleAutoReveal', () => {
-        // 手動でトグルしたことを記録
-        isManuallyToggled = true;
-        isAutoRevealEnabled = !isAutoRevealEnabled;
-        const status = isAutoRevealEnabled ? '有効' : '無効';
-        vscode.window.showInformationMessage(`自動ファイル選択: ${status}（手動モード）`);
 
-        // タイトルを更新してアイコンの表示/非表示を切り替え
-        workspaceExplorerProvider.updateTitle(vscode.window.activeTextEditor, isAutoRevealEnabled);
-
-        // 自動制御をリセットするためのタイマー（10秒後に自動制御に戻す）
-        setTimeout(() => {
-            isManuallyToggled = false;
-            vscode.window.showInformationMessage('自動ファイル選択: 自動制御モードに戻りました');
-        }, 10000);
-    });
-
-    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand, createFolderCommand, renameCommand, deleteCommand, toggleAutoRevealCommand);
+    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand, createFolderCommand, renameCommand, deleteCommand);
 
     // FileDetailsProviderのリソースクリーンアップを登録
     context.subscriptions.push({
@@ -1287,14 +1246,13 @@ class WorkspaceExplorerProvider implements vscode.TreeDataProvider<FileItem> {
         this.treeView = treeView;
     }
 
-    updateTitle(editor: vscode.TextEditor | undefined, isAutoRevealEnabled: boolean = false): void {
+    updateTitle(editor: vscode.TextEditor | undefined): void {
         if (this.treeView) {
-            const autoIcon = isAutoRevealEnabled ? '$(eye) ' : '';
             if (editor) {
                 const fileName = path.basename(editor.document.fileName);
-                this.treeView.title = `${autoIcon}エクスプローラー - ${fileName}`;
+                this.treeView.title = `エクスプローラー - ${fileName}`;
             } else {
-                this.treeView.title = `${autoIcon}エクスプローラー`;
+                this.treeView.title = `エクスプローラー`;
             }
         }
     }
