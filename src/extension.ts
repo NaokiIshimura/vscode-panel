@@ -73,8 +73,18 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.onDidChangeActiveTextEditor(async (editor) => {
         workspaceExplorerProvider.updateTitle(editor);
 
-        // 常に自動選択を実行
-        await workspaceExplorerProvider.revealActiveFile(editor);
+        // ビューが表示されている場合のみ自動選択を実行
+        // visible=trueはビューが表示されていることを意味する
+        if (workspaceView.visible) {
+            await workspaceExplorerProvider.revealActiveFile(editor);
+        }
+    });
+
+    // ビューが表示されたときに現在のファイルを選択
+    workspaceView.onDidChangeVisibility(async () => {
+        if (workspaceView.visible && vscode.window.activeTextEditor) {
+            await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
+        }
     });
 
     // 初期タイトルを設定
