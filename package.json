@@ -49,6 +49,19 @@
         "command": "fileList.openSettings",
         "title": "設定を開く",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "fileList.openGitFile",
+        "title": "Gitファイルを開く"
+      },
+      {
+        "command": "fileList.showGitDiff",
+        "title": "Git差分を表示"
+      },
+      {
+        "command": "fileList.refreshGitChanges",
+        "title": "Git変更を更新",
+        "icon": "$(refresh)"
       }
     ],
     "views": {
@@ -60,6 +73,10 @@
         {
           "id": "fileListDetails",
           "name": "ファイル一覧"
+        },
+        {
+          "id": "gitChanges",
+          "name": "Git変更ファイル"
         }
       ]
     },
@@ -97,6 +114,11 @@
         {
           "command": "fileList.goToParent",
           "when": "view == fileListDetails",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.refreshGitChanges",
+          "when": "view == gitChanges",
           "group": "navigation"
         }
       ],
