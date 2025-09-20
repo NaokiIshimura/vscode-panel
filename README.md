@@ -56,10 +56,34 @@ npm run watch
 
 ## インストール
 
+### 方法1: 開発モード（テスト用）
 1. このプロジェクトをクローンまたはダウンロード
 2. VSCodeで開く
 3. `F5`キーを押して拡張機能開発ホストを起動
 4. 新しいVSCodeウィンドウで拡張機能をテスト
+
+### 方法2: VSIXパッケージからインストール
+
+#### 最新のリリースを使用する場合:
+```bash
+# releasesディレクトリから直接インストール
+code --install-extension releases/file-list-extension-0.0.1.vsix
+```
+
+#### 自分でパッケージを作成する場合:
+1. VSCEツールをインストール:
+   ```bash
+   npm install -g @vscode/vsce
+   ```
+2. VSIXパッケージを作成:
+   ```bash
+   npm run package
+   ```
+3. 生成されたVSIXファイルをインストール:
+   ```bash
+   code --install-extension releases/file-list-extension-0.0.1.vsix
+   ```
+3. VS Codeを再起動
 
 ## 要件
 
