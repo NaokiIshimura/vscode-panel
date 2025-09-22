@@ -1,0 +1,67 @@
+{
+    "name": "file-list-extension",
+    "displayName": "File List Extension",
+    "description": "指定したディレクトリ内のファイルを一覧表示するVSCode拡張機能",
+    "version": "1.0.0",
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "fileList.selectFolder",
+                "title": "フォルダを選択",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "fileList.refresh",
+                "title": "更新",
+                "icon": "$(refresh)"
+            }
+        ],
+        "views": {
+            "fileListView": [
+                {
+                    "id": "fileListDetails",
+                    "name": "ファイル一覧"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "fileListView",
+                    "title": "File List",
+                    "icon": "$(split-vertical)"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "fileList.refresh",
+                    "when": "view == fileListDetails",
+                    "group": "navigation"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "package": "vsce package --out releases/"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.74.0",
+        "@types/node": "16.x",
+        "typescript": "^4.9.4"
+    }
+}

@@ -24,52 +24,7 @@ import { DebugLogger } from './services/DebugLogger';
 import { AutoRetryService } from './services/AutoRetryService';
 import { OperationHistoryManager } from './services/OperationHistoryManager';
 
-// =====================
-// TreeView 再登録ガード用レジストリ
-// VS Code の拡張が何らかの理由で二重 activate された場合や
-// ホットリロード/デバッグ再接続時に createTreeView が同一 ID で
-// 複数回呼ばれてエラーになるのを防ぐ。
-// =====================
-const viewRegistry: Record<string, vscode.TreeView<any>> = {};
-
-// 二重有効化防止フラグ (デバッグ再起動やホットリロードで activate が二度走るケース対策)
-declare global {
-    // eslint-disable-next-line no-var
-    var __fileListExtensionActivated: boolean | undefined;
-}
-
-if (globalThis.__fileListExtensionActivated) {
-    console.log('[File List Extension] activate() skipped: already activated');
-}
-
-function getOrCreateTreeView<T>(
-    id: string,
-    options: vscode.TreeViewOptions<T>,
-    disposables?: { push(d: vscode.Disposable): void }
-): vscode.TreeView<T> {
-    const existing = viewRegistry[id];
-    if (existing) {
-        return existing as vscode.TreeView<T>;
-    }
-    const view = vscode.window.createTreeView(id, options);
-    viewRegistry[id] = view;
-    // 拡張の dispose 時にレジストリから除去
-    const remover = new vscode.Disposable(() => {
-        if (viewRegistry[id] === view) {
-            delete viewRegistry[id];
-        }
-    });
-    if (disposables) {
-        disposables.push(remover);
-    }
-    return view;
-}
-
 export function activate(context: vscode.ExtensionContext) {
-    if (globalThis.__fileListExtensionActivated) {
-        return; // 既に初期化済み
-    }
-    globalThis.__fileListExtensionActivated = true;
     console.log('File List Extension が有効化されました');
 
     // Initialize core services first
@@ -168,12 +123,12 @@ export function activate(context: vscode.ExtensionContext) {
     };
 
     // ビューを登録
-    const workspaceView = getOrCreateTreeView('workspaceExplorer', {
+    const workspaceView = vscode.window.createTreeView('workspaceExplorer', {
         treeDataProvider: workspaceExplorerProvider,
         showCollapseAll: true,
         canSelectMany: true,
         dragAndDropController: dragDropHandler
-    }, context.subscriptions);
+    });
 
     // TreeViewをProviderに設定
     workspaceExplorerProvider.setTreeView(workspaceView);
@@ -209,12 +164,12 @@ export function activate(context: vscode.ExtensionContext) {
         }, 500);
     }
 
-    const treeView = getOrCreateTreeView('fileListExplorer', {
+    const treeView = vscode.window.createTreeView('fileListExplorer', {
         treeDataProvider: fileListProvider,
         showCollapseAll: true,
         canSelectMany: true,
         dragAndDropController: dragDropHandler
-    }, context.subscriptions);
+    });
 
     // TreeViewをProviderに設定
     fileListProvider.setTreeView(treeView);
@@ -222,17 +177,17 @@ export function activate(context: vscode.ExtensionContext) {
     // Register commands for file list provider
     fileListProvider.registerCommands(context);
 
-    const detailsView = getOrCreateTreeView('fileListDetails', {
+    const detailsView = vscode.window.createTreeView('fileListDetails', {
         treeDataProvider: fileDetailsProvider,
         showCollapseAll: true,
         canSelectMany: true,
         dragAndDropController: dragDropHandler
-    }, context.subscriptions);
+    });
 
-    const gitChangesView = getOrCreateTreeView('gitChanges', {
+    const gitChangesView = vscode.window.createTreeView('gitChanges', {
         treeDataProvider: gitChangesProvider,
         showCollapseAll: false
-    }, context.subscriptions);
+    });
 
     // FileDetailsProviderにdetailsViewの参照を渡す
     fileDetailsProvider.setTreeView(detailsView);
