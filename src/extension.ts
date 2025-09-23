@@ -1141,17 +1141,70 @@ class FileItem extends vscode.TreeItem {
 class GitChangesProvider implements vscode.TreeDataProvider<GitFileItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<GitFileItem | undefined | null | void> = new vscode.EventEmitter<GitFileItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<GitFileItem | undefined | null | void> = this._onDidChangeTreeData.event;
+    private refreshDebounceTimer: NodeJS.Timeout | undefined;
+    private isGitOperationInProgress: boolean = false;
+    private fileWatcher: vscode.FileSystemWatcher | undefined;
 
     constructor() {
-        // ファイルシステムの変更を監視
-        const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-        watcher.onDidChange(() => this.refresh());
-        watcher.onDidCreate(() => this.refresh());
-        watcher.onDidDelete(() => this.refresh());
+        // ファイルシステムの変更を監視（.gitディレクトリとnode_modulesは除外）
+        // globパターンで除外設定を明示的に指定
+        this.fileWatcher = vscode.workspace.createFileSystemWatcher(
+            new vscode.RelativePattern(
+                vscode.workspace.workspaceFolders?.[0] || '',
+                '**/{[!.],.[!g],.[g][!i],.[gi][!t]}*'  // .gitで始まるものを除外
+            ),
+            false,  // create
+            false,  // change
+            false   // delete
+        );
+
+        // デバウンス処理付きでrefreshを呼び出す
+        this.fileWatcher.onDidChange((uri) => {
+            // .gitディレクトリ内のファイルは無視
+            if (!uri.fsPath.includes('.git')) {
+                this.debouncedRefresh();
+            }
+        });
+        this.fileWatcher.onDidCreate((uri) => {
+            if (!uri.fsPath.includes('.git')) {
+                this.debouncedRefresh();
+            }
+        });
+        this.fileWatcher.onDidDelete((uri) => {
+            if (!uri.fsPath.includes('.git')) {
+                this.debouncedRefresh();
+            }
+        });
+    }
+
+    private debouncedRefresh(): void {
+        // 既存のタイマーをクリア
+        if (this.refreshDebounceTimer) {
+            clearTimeout(this.refreshDebounceTimer);
+        }
+
+        // 1000ms後に実行（連続した変更をまとめ、git操作との競合を回避）
+        this.refreshDebounceTimer = setTimeout(() => {
+            this.refresh();
+        }, 1000);
     }
 
     refresh(): void {
+        // git操作中の場合はスキップ
+        if (this.isGitOperationInProgress) {
+            console.log('Git operation in progress, skipping refresh');
+            return;
+        }
         this._onDidChangeTreeData.fire();
+    }
+
+    dispose(): void {
+        if (this.refreshDebounceTimer) {
+            clearTimeout(this.refreshDebounceTimer);
+        }
+        if (this.fileWatcher) {
+            this.fileWatcher.dispose();
+        }
     }
 
     async showDiff(item: GitFileItem): Promise<void> {
@@ -1183,9 +1236,14 @@ class GitChangesProvider implements vscode.TreeDataProvider<GitFileItem> {
     }
 
     private async showFileDiff(workspaceRoot: string, relativePath: string, filePath: string): Promise<void> {
+        // Git操作開始をマーク
+        this.isGitOperationInProgress = true;
+
         return new Promise((resolve, reject) => {
             // HEADバージョンの内容を取得
             exec(`git show HEAD:"${relativePath}"`, { cwd: workspaceRoot }, async (error, stdout, stderr) => {
+                // Git操作終了をマーク
+                this.isGitOperationInProgress = false;
                 if (error) {
                     // HEADにファイルが存在しない場合（新規追加）は空ファイルとの差分を表示
                     await this.showUntrackedFileDiff(relativePath, filePath);
@@ -1221,8 +1279,13 @@ class GitChangesProvider implements vscode.TreeDataProvider<GitFileItem> {
     }
 
     private async showDeletedFileDiff(workspaceRoot: string, relativePath: string): Promise<void> {
+        // Git操作開始をマーク
+        this.isGitOperationInProgress = true;
+
         return new Promise((resolve, reject) => {
             exec(`git show HEAD:"${relativePath}"`, { cwd: workspaceRoot }, async (error, stdout, stderr) => {
+                // Git操作終了をマーク
+                this.isGitOperationInProgress = false;
                 if (error) {
                     reject(error);
                     return;
@@ -1310,10 +1373,16 @@ class GitChangesProvider implements vscode.TreeDataProvider<GitFileItem> {
     }
 
     private async getGitChanges(workspaceRoot: string): Promise<GitChange[]> {
+        // Git操作開始をマーク
+        this.isGitOperationInProgress = true;
+
         return new Promise((resolve, reject) => {
-            
+
             // git statusコマンドでポーセリン形式で変更ファイルを取得
             exec('git status --porcelain=v1', { cwd: workspaceRoot }, (error: any, stdout: string, stderr: string) => {
+                // Git操作終了をマーク
+                this.isGitOperationInProgress = false;
+
                 if (error) {
                     resolve([]); // Gitリポジトリでない場合は空配列を返す
                     return;
