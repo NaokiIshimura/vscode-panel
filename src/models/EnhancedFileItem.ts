@@ -31,7 +31,7 @@ export class EnhancedFileItem extends vscode.TreeItem implements IEnhancedFileIt
     ) {
         super(label, collapsibleState);
         
-        this.id = filePath; // Use file path as unique identifier
+        this.id = this.generateUniqueId(filePath); // Use safe unique identifier
         this.label = label; // Ensure label is always a string
         this.filePath = filePath;
         this.isDirectory = isDirectory;
@@ -48,6 +48,15 @@ export class EnhancedFileItem extends vscode.TreeItem implements IEnhancedFileIt
         this.tooltip = this.getTooltip();
         this.command = this.getCommand();
         this.description = this.getDescription();
+    }
+
+    /**
+     * Generate a unique and safe ID for the tree item
+     */
+    private generateUniqueId(filePath: string): string {
+        // Use a hash of the file path to ensure uniqueness and avoid special characters
+        const crypto = require('crypto');
+        return crypto.createHash('md5').update(filePath).digest('hex');
     }
 
     /**
@@ -100,8 +109,8 @@ export class EnhancedFileItem extends vscode.TreeItem implements IEnhancedFileIt
     /**
      * Get tooltip text for the file item
      */
-    private getTooltip(): vscode.MarkdownString {
-        return FileInfoFormatter.createDetailedTooltip(this, true);
+    private getTooltip(): string {
+        return this.label;
     }
 
     /**
@@ -122,7 +131,7 @@ export class EnhancedFileItem extends vscode.TreeItem implements IEnhancedFileIt
      * Get description text for the file item
      */
     private getDescription(): string | undefined {
-        return FileInfoFormatter.createCompactDescription(this, true, true);
+        return undefined;
     }
 
     /**

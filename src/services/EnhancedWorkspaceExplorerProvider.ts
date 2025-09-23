@@ -27,6 +27,7 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
     private contextMenuManager: ContextMenuManager;
     private fileWatcher: vscode.FileSystemWatcher | undefined;
     private debounceTimeout: NodeJS.Timeout | undefined;
+    private expandedFolders: Set<string> = new Set(); // 展開されたフォルダを追跡
 
     constructor(context: vscode.ExtensionContext) {
         super();
@@ -61,7 +62,8 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
     private initializeWorkspaceRoot(): void {
         if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
             this.workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-            this.updateAllItems();
+            // Skip initial updateAllItems for better performance
+            // this.updateAllItems();
         }
     }
 
@@ -115,9 +117,7 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
      */
     private setupServiceIntegration(): void {
         // Note: Keyboard shortcuts are registered globally by KeyboardShortcutIntegration
-        
-        // Register context menus
-        this.contextMenuManager.registerContextMenus();
+        // Note: Context menus are registered globally in extension.ts
         
         // Set up clipboard integration
         this.displayDisposables.push(
@@ -161,7 +161,8 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
         }
         
         this.debounceTimeout = setTimeout(() => {
-            this.updateAllItems();
+            // Skip updateAllItems for better performance
+            // this.updateAllItems();
             this.refresh();
         }, 300);
     }
@@ -171,7 +172,8 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
      */
     public setWorkspaceRoot(rootPath: string): void {
         this.workspaceRoot = rootPath;
-        this.updateAllItems();
+        // Skip updateAllItems for better performance
+        // this.updateAllItems();
         this.refresh();
     }
 
@@ -185,13 +187,18 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
     // ===== TreeDataProvider Implementation =====
 
     public getTreeItem(element: EnhancedFileItem): vscode.TreeItem {
-        const treeItem = new vscode.TreeItem(
-            element.label,
-            element.isDirectory ? 
-                vscode.TreeItemCollapsibleState.Collapsed : 
-                vscode.TreeItemCollapsibleState.None
-        );
+        // Determine collapsible state based on whether folder is expanded
+        let collapsibleState = vscode.TreeItemCollapsibleState.None;
+        if (element.isDirectory) {
+            collapsibleState = this.isFolderExpanded(element.filePath) ? 
+                vscode.TreeItemCollapsibleState.Expanded : 
+                vscode.TreeItemCollapsibleState.Collapsed;
+        }
+        
+        const treeItem = new vscode.TreeItem(element.label, collapsibleState);
 
+        // Override all properties to ensure simple display
+        treeItem.id = element.id;
         treeItem.resourceUri = vscode.Uri.file(element.filePath);
         
         // Set context value with permission information
@@ -202,11 +209,11 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
             treeItem.iconPath = this.getIconWithPermissionIndicators(element);
         }
         
-        // Set enhanced tooltip with permission information
-        treeItem.tooltip = this.createEnhancedTooltip(element);
+        // Simple tooltip with just the file name
+        treeItem.tooltip = element.label;
 
-        // Add permission indicators to description (based on display settings)
-        treeItem.description = this.getDescriptionWithPermissions(element);
+        // No description - only show file/folder names
+        treeItem.description = undefined;
 
         // Set command for files
         if (!element.isDirectory) {
@@ -217,9 +224,35 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
             };
         }
 
-        // Update with selection state
-        return this.updateTreeItemWithSelection(treeItem, element);
+        // Return the tree item without selection indicators
+        return treeItem;
     }
+
+    /**
+     * Override to prevent adding ● marks to selected items
+     */
+    protected updateTreeItemWithSelection(treeItem: vscode.TreeItem, item: EnhancedFileItem): vscode.TreeItem {
+        // Don't add ● marks for selection - just return the item as-is
+        // Still update context value for functionality
+        const isSelected = this.selectionManager.isSelected(item);
+        
+        if (isSelected) {
+            // Update context value to indicate selection (for functionality)
+            const originalContext = treeItem.contextValue || '';
+            treeItem.contextValue = originalContext.includes(':selected') ? 
+                originalContext : `${originalContext}:selected`;
+        }
+
+        // Add search highlighting if active (without ● marks)
+        this.updateTreeItemWithSearchHighlight(treeItem, item);
+
+        // Add drag and drop context values
+        this.updateTreeItemWithDragDrop(treeItem, item);
+
+        return treeItem;
+    }
+
+
 
     public async getChildren(element?: EnhancedFileItem): Promise<EnhancedFileItem[]> {
         if (!this.workspaceRoot) {
@@ -236,15 +269,43 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
             
             const processedItems = this.processItems(filteredItems);
             
-            // Update all items if this is root level
-            if (!element) {
-                await this.updateAllItems();
-            }
+            // Skip updateAllItems for better performance
+            // if (!element) {
+            //     await this.updateAllItems();
+            // }
             
             return processedItems;
         } catch (error) {
             vscode.window.showErrorMessage(`ディレクトリの読み取りに失敗しました: ${error}`);
             return [];
+        }
+    }
+
+    public getParent(element: EnhancedFileItem): EnhancedFileItem | undefined {
+        if (!this.workspaceRoot || !element) {
+            return undefined;
+        }
+
+        const parentPath = path.dirname(element.filePath);
+        
+        // If parent is the workspace root or above, return undefined
+        if (parentPath === element.filePath || !parentPath.startsWith(this.workspaceRoot)) {
+            return undefined;
+        }
+
+        try {
+            // Create parent item synchronously for performance
+            const parentItem = new EnhancedFileItem(
+                path.basename(parentPath),
+                vscode.TreeItemCollapsibleState.Collapsed,
+                parentPath,
+                true, // isDirectory
+                0, // size (directories don't have meaningful size)
+                new Date() // modified (use current date as fallback)
+            );
+            return parentItem;
+        } catch (error) {
+            return undefined;
         }
     }
 
@@ -374,6 +435,481 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
         this.selectionManager.selectAll();
     }
 
+    /**
+     * Get selection manager instance
+     */
+    public getSelectionManager(): MultiSelectionManager {
+        return this.selectionManager;
+    }
+
+    /**
+     * Mark folder as expanded
+     */
+    public markFolderExpanded(folderPath: string): void {
+        this.expandedFolders.add(folderPath);
+        console.log('Marked folder as expanded:', folderPath);
+    }
+
+    /**
+     * Check if folder is expanded
+     */
+    public isFolderExpanded(folderPath: string): boolean {
+        return this.expandedFolders.has(folderPath);
+    }
+
+    /**
+     * Force expand folder in TreeView
+     */
+    public async forceExpandFolder(folderPath: string): Promise<void> {
+        try {
+            const folderItem = await this.findItemByPath(folderPath);
+            if (folderItem && folderItem.isDirectory && this.treeView) {
+                console.log('Force expanding folder:', folderItem.label, 'at path:', folderPath);
+                
+                // First, ensure the folder item has the correct collapsible state
+                folderItem.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+                
+                // Try multiple approaches to ensure expansion
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        // Method 1: Use reveal with expand
+                        await this.treeView.reveal(folderItem, {
+                            select: false,
+                            focus: false,
+                            expand: 3  // Expand up to 3 levels
+                        });
+                        
+                        // Method 2: Force refresh the tree to reflect changes
+                        this.refresh();
+                        
+                        // Mark as expanded
+                        this.markFolderExpanded(folderPath);
+                        
+                        // Wait for expansion to complete
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        
+                        console.log(`Force expand attempt ${i + 1} completed for:`, folderItem.label);
+                        
+                        // Verify expansion by checking if children are loaded
+                        try {
+                            const children = await this.getChildren(folderItem);
+                            if (children.length > 0) {
+                                console.log(`Folder expansion verified: ${children.length} children found`);
+                                break; // Success, exit the loop
+                            }
+                        } catch (childError) {
+                            console.warn('Failed to verify folder expansion:', childError);
+                        }
+                        
+                    } catch (revealError) {
+                        console.warn(`Reveal attempt ${i + 1} failed:`, revealError);
+                    }
+                }
+            } else {
+                console.warn('Cannot expand folder - item not found or not a directory:', folderPath);
+            }
+        } catch (error) {
+            console.warn('Failed to force expand folder:', folderPath, error);
+        }
+    }
+
+    /**
+     * Reveal file in explorer with parent folder expansion
+     */
+    public async revealFile(filePath: string): Promise<void> {
+        try {
+            console.log('=== Revealing file in Enhanced Workspace Explorer ===');
+            console.log('Target file path:', filePath);
+            
+            if (!this.treeView) {
+                console.warn('TreeView not available');
+                return;
+            }
+
+            // ワークスペース内のファイルかチェック
+            if (!this.workspaceRoot || !filePath.startsWith(this.workspaceRoot)) {
+                console.warn('File is not within workspace:', filePath);
+                return;
+            }
+
+            // シンプルなアプローチ: TreeView.revealの標準機能を最大限活用
+            await this.simpleRevealFile(filePath);
+
+            console.log('File revealed successfully in Enhanced Workspace Explorer');
+        } catch (error) {
+            console.error('Failed to reveal file in Enhanced Workspace Explorer:', error);
+        }
+    }
+
+    /**
+     * Simple file reveal using TreeView's built-in capabilities with proper parent loading
+     */
+    private async simpleRevealFile(filePath: string): Promise<void> {
+        if (!this.treeView || !this.workspaceRoot) {
+            return;
+        }
+
+        console.log('--- Simple file reveal with proper tree integration ---');
+        console.log('Target:', filePath);
+
+        try {
+            // Step 1: Ensure all parent directories are loaded and expanded
+            await this.ensureParentDirectoriesLoadedAndExpanded(filePath);
+            
+            // Step 2: Force a complete tree refresh to ensure all items are registered
+            this.refresh();
+            await new Promise(resolve => setTimeout(resolve, 400));
+            
+            // Step 3: Try to find the file item in the properly loaded tree
+            let fileItem = await this.findItemByPath(filePath);
+            
+            if (!fileItem) {
+                console.warn('File item still not found after proper tree loading');
+                // As a last resort, try to load the parent directory explicitly
+                const parentPath = path.dirname(filePath);
+                const parentItem = await this.findItemByPath(parentPath);
+                
+                if (parentItem && parentItem.isDirectory) {
+                    console.log('Loading parent directory children explicitly');
+                    const children = await this.getChildren(parentItem);
+                    fileItem = children.find(child => child.filePath === filePath);
+                    
+                    if (fileItem) {
+                        console.log('Found file item in parent directory children');
+                    }
+                }
+            }
+            
+            if (fileItem) {
+                console.log('Found file item in tree:', fileItem.label);
+                
+                // Now try to reveal and select the properly registered item
+                try {
+                    await this.treeView.reveal(fileItem, {
+                        select: true,
+                        focus: false,
+                        expand: 1
+                    });
+                    console.log('TreeView.reveal completed for registered item');
+                    
+                    // Update internal selection state
+                    this.selectionManager.setSelection([fileItem]);
+                    this.setSelectedItems([fileItem]);
+                    
+                    // Verify selection
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    const currentSelection = this.treeView.selection;
+                    console.log('Final TreeView selection count:', currentSelection.length);
+                    
+                    if (currentSelection.length > 0) {
+                        console.log('SUCCESS: File is now selected in TreeView');
+                    } else {
+                        console.warn('FAILED: File is still not selected in TreeView');
+                    }
+                    
+                } catch (revealError) {
+                    console.error('Error during reveal of registered item:', revealError);
+                }
+                
+            } else {
+                console.error('CRITICAL: Could not find file item even after proper tree loading');
+                console.log('This indicates a fundamental issue with the TreeDataProvider structure');
+            }
+            
+        } catch (error) {
+            console.error('Error in simpleRevealFile:', error);
+        }
+    }
+
+    /**
+     * Ensure all parent directories are loaded and expanded in the TreeView
+     */
+    private async ensureParentDirectoriesLoadedAndExpanded(filePath: string): Promise<void> {
+        if (!this.workspaceRoot) {
+            return;
+        }
+
+        console.log('--- Ensuring parent directories are loaded and expanded ---');
+        
+        const relativePath = path.relative(this.workspaceRoot, filePath);
+        const pathParts = relativePath.split(path.sep);
+        
+        // Remove the file name, keep only folder parts
+        pathParts.pop();
+        
+        console.log('Parent directories to load and expand:', pathParts);
+        
+        let currentPath = this.workspaceRoot;
+        let currentItem: EnhancedFileItem | undefined;
+        
+        // Start with root children
+        let currentChildren = await this.getChildren();
+        
+        // Load each parent directory sequentially
+        for (let i = 0; i < pathParts.length; i++) {
+            const part = pathParts[i];
+            currentPath = path.join(currentPath, part);
+            
+            console.log(`Loading and expanding directory ${i + 1}/${pathParts.length}:`, currentPath);
+            
+            // Find the directory in current children
+            currentItem = currentChildren.find(child => child.filePath === currentPath && child.isDirectory);
+            
+            if (currentItem) {
+                console.log(`Found directory item: ${currentItem.label}`);
+                
+                // Mark as expanded
+                this.markFolderExpanded(currentPath);
+                
+                // Load its children for the next iteration
+                currentChildren = await this.getChildren(currentItem);
+                console.log(`Loaded ${currentChildren.length} children from ${currentItem.label}`);
+                
+                // Wait for the loading to complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } else {
+                console.warn(`Directory not found in tree: ${currentPath}`);
+                break;
+            }
+        }
+        
+        console.log('--- Parent directories loading and expansion completed ---');
+    }
+
+    /**
+     * Ensure all parent directories are loaded in the TreeView (legacy method)
+     */
+    private async ensureParentDirectoriesLoaded(filePath: string): Promise<void> {
+        if (!this.workspaceRoot) {
+            return;
+        }
+
+        console.log('--- Ensuring parent directories are loaded ---');
+        
+        const relativePath = path.relative(this.workspaceRoot, filePath);
+        const pathParts = relativePath.split(path.sep);
+        
+        // Remove the file name, keep only folder parts
+        pathParts.pop();
+        
+        console.log('Parent directories to load:', pathParts);
+        
+        let currentPath = this.workspaceRoot;
+        
+        // Load each parent directory by calling getChildren
+        for (let i = 0; i < pathParts.length; i++) {
+            const part = pathParts[i];
+            currentPath = path.join(currentPath, part);
+            
+            console.log(`Loading directory ${i + 1}/${pathParts.length}:`, currentPath);
+            
+            try {
+                // Find the parent directory item
+                let parentItem: EnhancedFileItem | undefined;
+                
+                if (i === 0) {
+                    // For the first level, get children of root
+                    const rootChildren = await this.getChildren();
+                    parentItem = rootChildren.find(child => child.filePath === currentPath);
+                } else {
+                    // For deeper levels, find the parent item first
+                    const parentPath = path.dirname(currentPath);
+                    const parentOfParent = await this.findItemByPath(parentPath);
+                    if (parentOfParent) {
+                        const children = await this.getChildren(parentOfParent);
+                        parentItem = children.find(child => child.filePath === currentPath);
+                    }
+                }
+                
+                if (parentItem && parentItem.isDirectory) {
+                    console.log(`Loading children of: ${parentItem.label}`);
+                    // Load the children of this directory to make them available in the tree
+                    await this.getChildren(parentItem);
+                    
+                    // Mark as expanded
+                    this.markFolderExpanded(currentPath);
+                    
+                    // Update the tree
+                    this.refresh();
+                    
+                    // Wait for the update to complete
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } else {
+                    console.warn(`Parent directory not found: ${currentPath}`);
+                }
+                
+            } catch (error) {
+                console.warn(`Failed to load directory: ${currentPath}`, error);
+            }
+        }
+        
+        console.log('--- Parent directories loading completed ---');
+    }
+
+    /**
+     * Generate a unique ID for a file item based on its path
+     */
+    private generateItemId(filePath: string): string {
+        // Use a hash of the file path to ensure uniqueness
+        const crypto = require('crypto');
+        return crypto.createHash('md5').update(filePath).digest('hex');
+    }
+
+    /**
+     * Debug method to check TreeView state
+     */
+    private debugTreeViewState(): void {
+        if (this.treeView) {
+            console.log('=== TreeView Debug Info ===');
+            console.log('TreeView visible:', this.treeView.visible);
+            console.log('TreeView selection count:', this.treeView.selection.length);
+            if (this.treeView.selection.length > 0) {
+                this.treeView.selection.forEach((item, index) => {
+                    console.log(`Selection ${index}:`, item);
+                });
+            }
+            console.log('Selection manager has selection:', this.selectionManager.hasSelection());
+            console.log('=== End TreeView Debug Info ===');
+        }
+    }
+
+    /**
+     * Reveal file with automatic parent folder expansion using TreeView.reveal
+     */
+    private async revealFileWithParentExpansion(filePath: string): Promise<void> {
+        if (!this.workspaceRoot || !this.treeView) {
+            return;
+        }
+
+        console.log('--- Revealing file with automatic parent expansion ---');
+        console.log('Target file:', filePath);
+        
+        try {
+            // First, ensure the file item exists
+            let fileItem = await this.findItemByPath(filePath);
+            
+            if (!fileItem) {
+                console.log('File item not found, creating directly from filesystem');
+                // Create the file item directly
+                const fs = await import('fs');
+                if (fs.existsSync(filePath)) {
+                    const stat = await fs.promises.stat(filePath);
+                    const fileName = path.basename(filePath);
+                    
+                    fileItem = new EnhancedFileItem(
+                        fileName,
+                        stat.isDirectory() ? 
+                            vscode.TreeItemCollapsibleState.Collapsed : 
+                            vscode.TreeItemCollapsibleState.None,
+                        filePath,
+                        stat.isDirectory(),
+                        stat.isFile() ? stat.size : 0,
+                        stat.mtime,
+                        stat.birthtime
+                    );
+                    
+                    console.log('Created file item:', fileName);
+                } else {
+                    console.warn('File does not exist:', filePath);
+                    return;
+                }
+            }
+            
+            if (fileItem) {
+                console.log('Revealing file item:', fileItem.label);
+                
+                // Use TreeView.reveal with maximum expansion
+                // This should automatically expand all parent folders
+                await this.treeView.reveal(fileItem, {
+                    select: true,
+                    focus: false,
+                    expand: 10  // Expand many levels to ensure all parents are expanded
+                });
+                
+                console.log('TreeView.reveal completed');
+                
+                // Update selection state
+                this.selectionManager.setSelection([fileItem]);
+                this.setSelectedItems([fileItem]);
+                
+                // Force a refresh to ensure the tree is updated
+                this.refresh();
+                
+                console.log('File selection and tree refresh completed');
+            }
+            
+        } catch (error) {
+            console.error('Error in revealFileWithParentExpansion:', error);
+        }
+        
+        console.log('--- Automatic parent expansion completed ---');
+    }
+
+    /**
+     * Expand all parent folders for a given file path with TreeView refresh
+     */
+    private async expandParentFoldersWithRefresh(filePath: string): Promise<void> {
+        if (!this.workspaceRoot) {
+            return;
+        }
+
+        console.log('--- Expanding parent folders with refresh ---');
+        console.log('Workspace root:', this.workspaceRoot);
+        console.log('Target file:', filePath);
+
+        const relativePath = path.relative(this.workspaceRoot, filePath);
+        const pathParts = relativePath.split(path.sep);
+        
+        // Remove the file name, keep only folder parts
+        pathParts.pop();
+        
+        console.log('Folder parts to expand:', pathParts);
+        
+        let currentPath = this.workspaceRoot;
+        
+        // Expand each parent folder sequentially with refresh
+        for (let i = 0; i < pathParts.length; i++) {
+            const part = pathParts[i];
+            currentPath = path.join(currentPath, part);
+            
+            console.log(`Expanding folder ${i + 1}/${pathParts.length}:`, currentPath);
+            
+            try {
+                // Mark folder as expanded first
+                this.markFolderExpanded(currentPath);
+                
+                // Force a refresh to update the TreeView
+                this.refresh();
+                
+                // Wait for refresh to complete
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // Then try to expand the folder
+                await this.forceExpandFolder(currentPath);
+                
+                // Another refresh to ensure the expansion is visible
+                this.refresh();
+                
+                // Wait between expansions
+                await new Promise(resolve => setTimeout(resolve, 250));
+                
+                console.log(`Successfully expanded folder: ${currentPath}`);
+            } catch (error) {
+                console.warn(`Failed to expand folder: ${currentPath}`, error);
+            }
+        }
+        
+        console.log('--- Parent folder expansion with refresh completed ---');
+    }
+
+    /**
+     * Expand all parent folders for a given file path (legacy method)
+     */
+    private async expandParentFolders(filePath: string): Promise<void> {
+        // Use the new method with refresh
+        await this.expandParentFoldersWithRefresh(filePath);
+    }
+
     // ===== Private Methods =====
 
     /**
@@ -393,8 +929,8 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
         try {
             const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
 
-            // Process entries in batches for better performance with large directories
-            const batchSize = 50;
+            // Process entries in smaller batches for better responsiveness
+            const batchSize = 20;
             for (let i = 0; i < entries.length; i += batchSize) {
                 const batch = entries.slice(i, i + batchSize);
                 
@@ -412,8 +948,8 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
 
                         const stat = await fs.promises.stat(fullPath);
                         
-                        // Detect permissions using enhanced permission detector
-                        const permissions = await PermissionDetector.detectPermissions(fullPath);
+                        // Skip permission detection for better performance
+                        const permissions = undefined;
 
                         const item = new EnhancedFileItem(
                             entry.name,
@@ -558,46 +1094,7 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
         return new vscode.ThemeIcon(iconName);
     }
 
-    /**
-     * Create enhanced tooltip with permission information
-     */
-    private createEnhancedTooltip(element: EnhancedFileItem): vscode.MarkdownString {
-        // Use the FileInfoFormatter to create a detailed tooltip with permission information
-        return FileInfoFormatter.createDetailedTooltip(element, true);
-    }
 
-    /**
-     * Get description with permission indicators
-     */
-    private getDescriptionWithPermissions(element: EnhancedFileItem): string {
-        const parts: string[] = [];
-        
-        // Add file size for files (if enabled in display settings)
-        if (!element.isDirectory && element.size > 0 && displayCustomizationService.getShowFileSize()) {
-            parts.push(this.formatFileSize(element.size));
-        }
-        
-        // Add modified date (if enabled in display settings)
-        if (displayCustomizationService.getShowModifiedDate()) {
-            const formattedDate = FileInfoFormatter.formatModifiedDate(element.modified);
-            parts.push(formattedDate);
-        }
-        
-        // Add permission summary (always show for security)
-        if (element.permissions) {
-            const permissionSummary = PermissionDetector.getPermissionSummary(element.permissions);
-            if (permissionSummary) {
-                parts.push(`[${permissionSummary}]`);
-            }
-        }
-        
-        // Apply compact mode formatting
-        if (displayCustomizationService.getCompactMode()) {
-            return parts.join('|'); // More compact separator
-        }
-        
-        return parts.join(' ');
-    }
 
     // ===== Public API Methods =====
 
@@ -870,28 +1367,193 @@ export class EnhancedWorkspaceExplorerProvider extends EnhancedTreeDataProvider<
      */
     public async revealActiveFile(editor?: vscode.TextEditor): Promise<void> {
         if (!editor || editor.document.uri.scheme !== 'file') {
+            console.log('RevealActiveFile: No valid editor or not a file scheme');
             return;
         }
 
         const filePath = editor.document.uri.fsPath;
+        console.log('RevealActiveFile: Attempting to reveal file:', filePath);
         
-        // Find the item in the tree
-        const item = await this.findItemByPath(filePath);
-        if (item) {
-            // The actual reveal functionality would be handled by the TreeView
-            // This is just a placeholder for the interface
+        try {
+            // Check if file is within workspace
+            if (!this.workspaceRoot || !filePath.startsWith(this.workspaceRoot)) {
+                console.log('RevealActiveFile: File is not within workspace root');
+                return;
+            }
+
+            // Load parent directories hierarchically to ensure the file can be found
+            await this.loadParentDirectoriesHierarchically(filePath);
+            
+            // Expand parent folders step by step
+            await this.expandParentFoldersStepByStep(filePath);
+            
+            // Find the item in the tree
+            const item = await this.findItemByPath(filePath);
+            if (item) {
+                console.log('RevealActiveFile: Found item, revealing in tree view:', item.label);
+                
+                // Use the TreeView to reveal and select the item
+                if (this.treeView) {
+                    await this.treeView.reveal(item, {
+                        select: true,
+                        focus: false,
+                        expand: true
+                    });
+                    
+                    // Update selection manager
+                    this.selectionManager.setSelection([item]);
+                    console.log('RevealActiveFile: Successfully revealed and selected file');
+                } else {
+                    console.warn('RevealActiveFile: TreeView not available');
+                }
+            } else {
+                console.warn('RevealActiveFile: Item not found in tree:', filePath);
+            }
+        } catch (error) {
+            console.error('RevealActiveFile: Error revealing active file:', error);
         }
     }
 
     /**
-     * Find item by file path
+     * Find item by file path in the loaded tree
      */
-    private async findItemByPath(filePath: string): Promise<EnhancedFileItem | undefined> {
+    public async findItemByPath(filePath: string): Promise<EnhancedFileItem | undefined> {
         try {
-            const item = await EnhancedFileItem.fromPath(filePath);
-            return item;
+            console.log('--- Finding item by path ---');
+            console.log('Target path:', filePath);
+            
+            // First, try to find in already loaded items
+            const existingItem = this.findInLoadedItems(filePath);
+            if (existingItem) {
+                console.log('Found existing item:', existingItem.label);
+                return existingItem;
+            }
+
+            // If not found, load all parent directories hierarchically
+            console.log('Item not found in loaded items, loading parent directories...');
+            await this.loadParentDirectoriesHierarchically(filePath);
+            
+            // Try to find again after loading parents
+            const foundItem = this.findInLoadedItems(filePath);
+            if (foundItem) {
+                console.log('Found item after loading parents:', foundItem.label);
+                return foundItem;
+            }
+
+            // If still not found, try to create the item directly from file system
+            console.log('Item still not found, creating directly from file system...');
+            try {
+                // Check if file exists first
+                const fs = await import('fs');
+                if (!fs.existsSync(filePath)) {
+                    console.warn('File does not exist:', filePath);
+                    return undefined;
+                }
+
+                const stat = await fs.promises.stat(filePath);
+                const fileName = path.basename(filePath);
+                
+                const item = new EnhancedFileItem(
+                    fileName,
+                    stat.isDirectory() ? 
+                        vscode.TreeItemCollapsibleState.Collapsed : 
+                        vscode.TreeItemCollapsibleState.None,
+                    filePath,
+                    stat.isDirectory(),
+                    stat.isFile() ? stat.size : 0,
+                    stat.mtime,
+                    stat.birthtime
+                );
+                
+                console.log('Created item directly:', item.label);
+                return item;
+            } catch (createError) {
+                console.warn('Failed to create item from path:', createError);
+                return undefined;
+            }
         } catch (error) {
+            console.warn('Error finding item by path:', error);
             return undefined;
+        }
+    }
+
+    /**
+     * Load parent directories hierarchically
+     */
+    private async loadParentDirectoriesHierarchically(filePath: string): Promise<void> {
+        if (!this.workspaceRoot) return;
+
+        try {
+            const relativePath = path.relative(this.workspaceRoot, filePath);
+            const pathParts = relativePath.split(path.sep);
+            
+            // Build parent directory paths from root to target
+            let currentPath = this.workspaceRoot;
+            
+            for (let i = 0; i < pathParts.length - 1; i++) {
+                currentPath = path.join(currentPath, pathParts[i]);
+                await this.loadDirectoryIfNeeded(currentPath);
+            }
+        } catch (error) {
+            console.warn('Failed to load parent directories hierarchically:', error);
+        }
+    }
+
+    /**
+     * Expand parent folders step by step in the TreeView
+     */
+    private async expandParentFoldersStepByStep(filePath: string): Promise<void> {
+        if (!this.workspaceRoot || !this.treeView) return;
+
+        try {
+            console.log('Expanding parent folders step by step for:', filePath);
+            
+            const relativePath = path.relative(this.workspaceRoot, filePath);
+            const pathParts = relativePath.split(path.sep);
+            
+            // Build parent directory paths from root to target
+            let currentPath = this.workspaceRoot;
+            
+            for (let i = 0; i < pathParts.length - 1; i++) {
+                currentPath = path.join(currentPath, pathParts[i]);
+                
+                try {
+                    // Use the force expand method for more reliable expansion
+                    await this.forceExpandFolder(currentPath);
+                } catch (expandError) {
+                    console.warn('Failed to expand parent folder:', currentPath, expandError);
+                }
+            }
+            
+            console.log('Parent folder expansion completed');
+        } catch (error) {
+            console.warn('Failed to expand parent folders step by step:', error);
+        }
+    }
+
+    /**
+     * Find item in already loaded items
+     */
+    private findInLoadedItems(filePath: string): EnhancedFileItem | undefined {
+        // Search in all loaded items
+        return this.allItems.find(item => item.filePath === filePath);
+    }
+
+    /**
+     * Load directory if not already loaded
+     */
+    private async loadDirectoryIfNeeded(dirPath: string): Promise<void> {
+        try {
+            // Check if directory items are already cached
+            const cacheKey = `dir:${dirPath}`;
+            const cachedItems = this.cacheManager.get<EnhancedFileItem[]>(cacheKey);
+            
+            if (!cachedItems) {
+                // Load the directory
+                await this.getItemsInDirectory(dirPath);
+            }
+        } catch (error) {
+            console.warn('Error loading directory:', error);
         }
     }
 }

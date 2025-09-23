@@ -14,8 +14,8 @@ import { SearchUIManager } from './services/SearchUIManager';
 import { DisplayCustomizationService } from './services/DisplayCustomizationService';
 import { FileCreationService } from './services/FileCreationService';
 import { EnhancedWorkspaceExplorerProvider } from './services/EnhancedWorkspaceExplorerProvider';
-import { EnhancedFileListProvider } from './services/EnhancedFileListProvider';
-import { EnhancedFileDetailsProvider } from './services/EnhancedFileDetailsProvider';
+import { SimpleFileListProvider } from './services/SimpleFileListProvider';
+import { SimpleFileDetailsProvider } from './services/SimpleFileDetailsProvider';
 import { FileSystemCacheManager } from './services/FileSystemCacheManager';
 import { LargeDirectoryOptimizer } from './services/LargeDirectoryOptimizer';
 import { EnhancedFileItem } from './models/EnhancedFileItem';
@@ -92,8 +92,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Enhanced TreeDataProviders を作成
     const workspaceExplorerProvider = new EnhancedWorkspaceExplorerProvider(context);
-    const fileListProvider = new EnhancedFileListProvider(context);
-    const fileDetailsProvider = new EnhancedFileDetailsProvider(context);
+    const fileListProvider = new SimpleFileListProvider(context);
+    const fileDetailsProvider = new SimpleFileDetailsProvider(context);
     const gitChangesProvider = new GitChangesProvider();
 
     // Keyboard shortcut services - 一時的にコメントアウト
@@ -181,52 +181,127 @@ export function activate(context: vscode.ExtensionContext) {
     // Register commands for workspace explorer
     workspaceExplorerProvider.registerCommands(context);
 
-    // アクティブエディタの変更を監視
-    vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+    // アクティブエディタの変更を監視して自動ファイル選択機能を実装
+    const activeEditorDisposable = vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        console.log('=== Active Editor Changed ===');
+        console.log('Editor:', editor ? editor.document.fileName : 'none');
+        
         workspaceExplorerProvider.updateTitle(editor);
 
-        // ビューが表示されている場合のみ自動選択を実行
-        // visible=trueはビューが表示されていることを意味する
-        if (workspaceView.visible) {
-            await workspaceExplorerProvider.revealActiveFile(editor);
+        // 設定で自動ファイル選択機能が有効かチェック
+        const autoRevealEnabled = vscode.workspace.getConfiguration('fileListExtension.explorer').get<boolean>('autoRevealActiveFile', true);
+        console.log('Auto reveal active file setting:', autoRevealEnabled);
+
+        // 自動ファイル選択機能
+        if (autoRevealEnabled && editor && editor.document.uri.scheme === 'file') {
+            console.log('Triggering auto file selection in Extension Explorer');
+            
+            // 少し遅延を入れてTreeViewが準備されるのを待つ
+            setTimeout(async () => {
+                try {
+                    await revealInWorkspaceExplorer(editor.document.fileName);
+                } catch (error) {
+                    console.error('Auto file selection failed:', error);
+                }
+            }, 200);
+        } else if (!autoRevealEnabled) {
+            console.log('Auto file selection is disabled by user setting');
         }
     });
 
     // ビューが表示されたときに現在のファイルを選択
-    workspaceView.onDidChangeVisibility(async () => {
-        if (workspaceView.visible && vscode.window.activeTextEditor) {
-            await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
+    const visibilityDisposable = workspaceView.onDidChangeVisibility(async () => {
+        console.log('=== Workspace Explorer Visibility Changed ===');
+        console.log('Visible:', workspaceView.visible);
+        
+        const autoRevealEnabled = vscode.workspace.getConfiguration('fileListExtension.explorer').get<boolean>('autoRevealActiveFile', true);
+        
+        if (autoRevealEnabled && workspaceView.visible && vscode.window.activeTextEditor) {
+            console.log('View became visible, revealing current active file');
+            const activeEditor = vscode.window.activeTextEditor;
+            setTimeout(async () => {
+                try {
+                    if (activeEditor) {
+                        await revealInWorkspaceExplorer(activeEditor.document.fileName);
+                    }
+                } catch (error) {
+                    console.error('Reveal on visibility change failed:', error);
+                }
+            }, 300);
+        } else if (!autoRevealEnabled) {
+            console.log('Auto reveal on visibility change is disabled by user setting');
         }
     });
 
     // 初期タイトルを設定
     workspaceExplorerProvider.updateTitle(vscode.window.activeTextEditor);
 
-    // 初期ファイルの選択
-    if (vscode.window.activeTextEditor) {
+    // 初期ファイルの選択（拡張機能起動時）
+    const autoRevealEnabled = vscode.workspace.getConfiguration('fileListExtension.explorer').get<boolean>('autoRevealActiveFile', true);
+    
+    if (autoRevealEnabled && vscode.window.activeTextEditor) {
+        console.log('=== Initial File Selection ===');
+        const initialActiveEditor = vscode.window.activeTextEditor;
+        console.log('Initial active file:', initialActiveEditor.document.fileName);
+        
         setTimeout(async () => {
-            await workspaceExplorerProvider.revealActiveFile(vscode.window.activeTextEditor);
-        }, 500);
+            try {
+                if (initialActiveEditor) {
+                    await revealInWorkspaceExplorer(initialActiveEditor.document.fileName);
+                    console.log('Initial file selection completed');
+                }
+            } catch (error) {
+                console.error('Initial file selection failed:', error);
+            }
+        }, 1000); // 初期化時は少し長めの遅延
+    } else if (!autoRevealEnabled) {
+        console.log('Initial file selection is disabled by user setting');
     }
+
+    // 設定変更の監視
+    const configurationDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration('fileListExtension.explorer.autoRevealActiveFile')) {
+            const newSetting = vscode.workspace.getConfiguration('fileListExtension.explorer').get<boolean>('autoRevealActiveFile', true);
+            console.log('Auto reveal active file setting changed to:', newSetting);
+            
+            // 設定が有効になった場合、現在のアクティブファイルを選択
+            if (newSetting && vscode.window.activeTextEditor) {
+                const currentActiveEditor = vscode.window.activeTextEditor;
+                setTimeout(async () => {
+                    try {
+                        if (currentActiveEditor) {
+                            await revealInWorkspaceExplorer(currentActiveEditor.document.fileName);
+                            console.log('Auto reveal re-enabled, selected current active file');
+                        }
+                    } catch (error) {
+                        console.error('Auto reveal on setting change failed:', error);
+                    }
+                }, 200);
+            }
+        }
+    });
+
+    // Disposableを登録
+    context.subscriptions.push(activeEditorDisposable, visibilityDisposable, configurationDisposable);
 
     const treeView = getOrCreateTreeView('fileListExplorer', {
         treeDataProvider: fileListProvider,
         showCollapseAll: true,
-        canSelectMany: true,
-        dragAndDropController: dragDropHandler
+        canSelectMany: false, // 複数選択を無効化
+        // dragAndDropController を削除（ドラッグ&ドロップ無効化）
     }, context.subscriptions);
 
     // TreeViewをProviderに設定
     fileListProvider.setTreeView(treeView);
 
-    // Register commands for file list provider
+    // フォルダツリーペインは基本的なフォルダ選択のみ（VSCode標準操作なし）
     fileListProvider.registerCommands(context);
 
     const detailsView = getOrCreateTreeView('fileListDetails', {
         treeDataProvider: fileDetailsProvider,
         showCollapseAll: true,
-        canSelectMany: true,
-        dragAndDropController: dragDropHandler
+        canSelectMany: false, // 複数選択を無効化
+        // dragAndDropController を削除（ドラッグ&ドロップ無効化）
     }, context.subscriptions);
 
     const gitChangesView = getOrCreateTreeView('gitChanges', {
@@ -237,8 +312,53 @@ export function activate(context: vscode.ExtensionContext) {
     // FileDetailsProviderにdetailsViewの参照を渡す
     fileDetailsProvider.setTreeView(detailsView);
 
-    // Register commands for file details provider
+    // ファイル一覧viewでファイル選択時に拡張機能のエクスプローラーで親フォルダを展開して選択状態にする
+    detailsView.onDidChangeSelection(async (e) => {
+        console.log('=== File Details View Selection Changed ===');
+        console.log('Selection count:', e.selection.length);
+        if (e.selection.length > 0) {
+            const selectedItem = e.selection[0];
+            console.log('Selected item in details view:', selectedItem.label || selectedItem);
+            console.log('Selected item filePath:', selectedItem.filePath);
+            
+            // 拡張機能のエクスプローラーで選択
+            await revealInWorkspaceExplorer(selectedItem.filePath);
+        }
+    });
+
+    // GIT変更ファイルviewでファイル選択時に拡張機能のエクスプローラーで親フォルダを展開して選択状態にする
+    gitChangesView.onDidChangeSelection(async (e) => {
+        console.log('=== Git Changes View Selection Changed ===');
+        console.log('Selection count:', e.selection.length);
+        if (e.selection.length > 0) {
+            const selectedItem = e.selection[0];
+            console.log('Selected item in git view:', selectedItem.label || selectedItem);
+            console.log('Selected item filePath:', selectedItem.filePath);
+            
+            // 拡張機能のエクスプローラーで選択
+            await revealInWorkspaceExplorer(selectedItem.filePath);
+        }
+    });
+
+    // ファイル一覧ペインは基本的なファイル表示のみ（VSCode標準操作なし）
     fileDetailsProvider.registerCommands(context);
+
+    // 拡張機能のエクスプローラーでファイルを選択する関数
+    async function revealInWorkspaceExplorer(filePath: string): Promise<void> {
+        try {
+            console.log('=== Revealing file in Extension Workspace Explorer ===');
+            console.log('Target file path:', filePath);
+            
+            // EnhancedWorkspaceExplorerProviderのrevealFileメソッドを使用
+            await workspaceExplorerProvider.revealFile(filePath);
+            
+            console.log('File revealed successfully in Extension Workspace Explorer');
+        } catch (error) {
+            console.error('Failed to reveal file in Extension Workspace Explorer:', error);
+        }
+    }
+
+
 
 
 
@@ -281,10 +401,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // 更新コマンドを登録
-    const refreshCommand = vscode.commands.registerCommand('fileList.refresh', () => {
-        fileListProvider.refresh();
-    });
+    // 更新コマンドは各プロバイダーで登録されます
 
     // 下ペイン表示コマンドを登録
     const showInPanelCommand = vscode.commands.registerCommand('fileList.showInPanel', async (item: FileItem) => {
@@ -632,12 +749,9 @@ export function activate(context: vscode.ExtensionContext) {
         if (workspaceExplorerProvider && typeof workspaceExplorerProvider.clearSearch === 'function') {
             workspaceExplorerProvider.clearSearch();
         }
-        if (fileListProvider && typeof fileListProvider.clearCache === 'function') {
-            fileListProvider.clearCache();
-        }
-        if (fileDetailsProvider && typeof fileDetailsProvider.clearSearch === 'function') {
-            fileDetailsProvider.clearSearch();
-        }
+        // 簡素化されたプロバイダーでは基本的な更新のみ
+        fileListProvider.refresh();
+        fileDetailsProvider.refresh();
     });
 
     const searchHistoryCommand = vscode.commands.registerCommand('fileListExtension.searchHistory', async () => {
@@ -693,7 +807,6 @@ export function activate(context: vscode.ExtensionContext) {
     // Register all commands with context
     context.subscriptions.push(
         selectFolderCommand,
-        refreshCommand,
         showInPanelCommand,
         openFolderCommand,
         goToParentCommand,
@@ -1425,8 +1538,8 @@ class GitFileItem extends vscode.TreeItem {
         // ステータスに応じたアイコンを設定
         this.iconPath = this.getStatusIcon(status);
 
-        // 説明にステータスと相対パスを表示
-        this.description = `${status} • ${relativePath}`;
+        // 説明にステータスのみを表示（ファイル名の重複を避ける）
+        this.description = status;
 
         // ツールチップを設定
         this.tooltip = `${relativePath}\nStatus: ${status}`;

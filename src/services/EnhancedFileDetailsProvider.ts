@@ -27,6 +27,8 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
     private fileOperationService: FileOperationService;
     private keyboardShortcutHandler: KeyboardShortcutHandler;
     private contextMenuManager: ContextMenuManager;
+    // VSCode標準操作関連のサービスは「エクスプローラー」ビューでのみ利用
+    // ファイル一覧ペインでは基本的なファイル表示機能のみ提供
     private debounceTimeout: NodeJS.Timeout | undefined;
     private displayDisposables: vscode.Disposable[] = [];
 
@@ -37,7 +39,6 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         this.cacheManager = new FileSystemCacheManager();
         this.clipboardManager = new ClipboardManager(context);
         this.fileOperationService = new FileOperationService();
-        this.selectionManager = new MultiSelectionManager();
         this.keyboardShortcutHandler = new KeyboardShortcutHandler(
             context,
             this.clipboardManager,
@@ -73,7 +74,8 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         this.updateTitle();
         this.setupFileWatcher();
         this.cacheManager.clear(); // Clear cache when changing root
-        this.updateAllItems();
+        // Skip updateAllItems for better performance
+        // this.updateAllItems();
         this.refresh();
     }
 
@@ -107,21 +109,21 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
      */
     private setupServiceIntegration(): void {
         // Note: Keyboard shortcuts are registered globally by KeyboardShortcutIntegration
-        this.contextMenuManager.registerContextMenus();
+        // Note: Context menus are registered globally in extension.ts
         
         this.displayDisposables.push(
-            this.clipboardManager.onClipboardChanged(() => {
+            this.getClipboardManager().onClipboardChanged(() => {
                 this.refresh();
             })
         );
         
         this.displayDisposables.push(
             this.selectionManager.onSelectionChanged((selection) => {
-                this.keyboardShortcutHandler.updateContext({
+                this.getKeyboardShortcutHandler().updateContext({
                     activeProvider: 'file-details',
                     selectedItems: selection,
                     currentPath: this.rootPath,
-                    canPaste: this.clipboardManager.canPaste()
+                    canPaste: this.getClipboardManager().canPaste()
                 });
             })
         );
@@ -144,7 +146,8 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         }
         
         this.debounceTimeout = setTimeout(() => {
-            this.updateAllItems();
+            // Skip updateAllItems for better performance
+            // this.updateAllItems();
             this.refresh();
         }, 300);
     }
@@ -191,21 +194,21 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
     // ===== IExplorerManager Implementation =====
 
     public async copyToClipboard(items: IEnhancedFileItem[]): Promise<void> {
-        await this.clipboardManager.copy(items);
+        await this.getClipboardManager().copy(items);
     }
 
     public async cutToClipboard(items: IEnhancedFileItem[]): Promise<void> {
-        await this.clipboardManager.cut(items);
+        await this.getClipboardManager().cut(items);
     }
 
     public async pasteFromClipboard(targetPath: string): Promise<void> {
-        if (!this.clipboardManager.canPaste()) {
+        if (!this.getClipboardManager().canPaste()) {
             vscode.window.showWarningMessage('クリップボードにアイテムがありません');
             return;
         }
 
         try {
-            await this.clipboardManager.paste(targetPath);
+            await this.getClipboardManager().paste(targetPath);
             this.handleFileSystemChange();
             vscode.window.showInformationMessage('貼り付けが完了しました');
         } catch (error) {
@@ -219,7 +222,7 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         const itemPaths = items.map(item => item.filePath);
         
         try {
-            await this.fileOperationService.deleteFiles(itemPaths);
+            await this.getFileOperationService().deleteFiles(itemPaths);
             this.handleFileSystemChange();
             
             const message = items.length === 1 
@@ -235,7 +238,7 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         const newPath = path.join(path.dirname(item.filePath), newName);
         
         try {
-            await this.fileOperationService.renameFile(item.filePath, newPath);
+            await this.getFileOperationService().renameFile(item.filePath, newPath);
             this.handleFileSystemChange();
             vscode.window.showInformationMessage(`"${item.label}" を "${newName}" にリネームしました`);
         } catch (error) {
@@ -247,7 +250,7 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         const filePath = path.join(parentPath, fileName);
         
         try {
-            await this.fileOperationService.createFile(filePath);
+            await this.getFileOperationService().createFile(filePath);
             this.handleFileSystemChange();
             vscode.window.showInformationMessage(`ファイル "${fileName}" を作成しました`);
         } catch (error) {
@@ -259,7 +262,7 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         const folderPath = path.join(parentPath, folderName);
         
         try {
-            await this.fileOperationService.createDirectory(folderPath);
+            await this.getFileOperationService().createDirectory(folderPath);
             this.handleFileSystemChange();
             vscode.window.showInformationMessage(`フォルダ "${folderName}" を作成しました`);
         } catch (error) {
@@ -283,15 +286,17 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
                 vscode.TreeItemCollapsibleState.None
         );
 
+        // Override all properties to ensure simple display
+        treeItem.id = element.id;
         treeItem.resourceUri = vscode.Uri.file(element.filePath);
         treeItem.contextValue = this.getEnhancedContextValue(element);
         treeItem.iconPath = this.getEnhancedIconPath(element);
         
-        // Set enhanced tooltip with detailed information
-        treeItem.tooltip = FileInfoFormatter.createDetailedTooltip(element, true);
+        // Simple tooltip with just the file name
+        treeItem.tooltip = element.label;
 
-        // Set enhanced description with size and time info
-        treeItem.description = FileInfoFormatter.createCompactDescription(element, true, true);
+        // No description - only show file/folder names
+        treeItem.description = undefined;
 
         // Set command for files
         if (!element.isDirectory) {
@@ -317,8 +322,8 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
                 const items = await this.getItemsInDirectory(this.rootPath);
                 const processedItems = this.processItems(items);
                 
-                // Update all items for root level
-                await this.updateAllItems();
+                // Skip updateAllItems for better performance
+                // await this.updateAllItems();
                 
                 return processedItems;
             } catch (error) {
@@ -336,6 +341,34 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         } catch (error) {
             vscode.window.showErrorMessage(`ディレクトリの読み取りに失敗しました: ${error}`);
             return [];
+        }
+    }
+
+    public getParent(element: EnhancedFileItem): EnhancedFileItem | undefined {
+        if (!this.rootPath || !element) {
+            return undefined;
+        }
+
+        const parentPath = path.dirname(element.filePath);
+        
+        // If parent is the root path or above, return undefined
+        if (parentPath === element.filePath || !parentPath.startsWith(this.rootPath)) {
+            return undefined;
+        }
+
+        try {
+            // Create parent item synchronously for performance
+            const parentItem = new EnhancedFileItem(
+                path.basename(parentPath),
+                vscode.TreeItemCollapsibleState.Collapsed,
+                parentPath,
+                true, // isDirectory
+                0, // size (directories don't have meaningful size)
+                new Date() // modified (use current date as fallback)
+            );
+            return parentItem;
+        } catch (error) {
+            return undefined;
         }
     }
 
@@ -370,8 +403,8 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
         try {
             const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
 
-            // Process entries in batches for better performance
-            const batchSize = 50;
+            // Process entries in smaller batches for better responsiveness
+            const batchSize = 20;
             for (let i = 0; i < entries.length; i += batchSize) {
                 const batch = entries.slice(i, i + batchSize);
                 
@@ -389,8 +422,8 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
 
                         const stat = await fs.promises.stat(fullPath);
                         
-                        // Detect permissions using the enhanced utility
-                        const permissions = await PermissionDetector.detectPermissions(fullPath);
+                        // Skip permission detection for better performance
+                        const permissions = undefined;
 
                         const item = new EnhancedFileItem(
                             entry.name,
@@ -689,7 +722,7 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
             rootPath: this.rootPath,
             projectRootPath: this.projectRootPath,
             selectedItems: this.getSelectedItems(),
-            canPaste: this.clipboardManager.canPaste(),
+            canPaste: this.getClipboardManager().canPaste(),
             cacheStats: this.getCacheStats()
         };
     }
@@ -714,33 +747,15 @@ export class EnhancedFileDetailsProvider extends EnhancedTreeDataProvider<Enhanc
     }
 
     /**
-     * Register additional commands
+     * ファイル一覧ペインは基本的なファイル表示のみ提供
+     * VSCode標準操作は「エクスプローラー」ビューでのみ利用可能
      */
     public registerCommands(context: vscode.ExtensionContext): void {
+        // ファイル一覧ペインでは基本的なコマンドのみ登録
         const commands = [
+            // 基本的な更新機能のみ
             vscode.commands.registerCommand('fileDetails.refresh', () => {
-                this.clearCache();
                 this.refreshTree();
-            }),
-            vscode.commands.registerCommand('fileDetails.clearCache', () => {
-                this.clearCache();
-            }),
-            vscode.commands.registerCommand('fileDetails.goToParent', () => {
-                this.goToParentFolder();
-            }),
-            vscode.commands.registerCommand('fileDetails.preloadAll', async () => {
-                if (this.rootPath) {
-                    await this.preloadDirectory(this.rootPath);
-                    vscode.window.showInformationMessage('ファイル詳細の事前読み込みが完了しました');
-                }
-            }),
-            vscode.commands.registerCommand('fileDetails.showStats', () => {
-                const fileCount = this.getFileCount();
-                fileCount.then(stats => {
-                    vscode.window.showInformationMessage(
-                        `ファイル: ${stats.files}個, フォルダ: ${stats.directories}個`
-                    );
-                });
             })
         ];
 

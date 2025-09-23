@@ -269,40 +269,46 @@
         },
         {
           "command": "fileListExtension.search",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
+          "when": "view == workspaceExplorer",
           "group": "navigation"
         },
         {
           "command": "fileListExtension.clearSearch",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
+          "when": "view == workspaceExplorer",
           "group": "navigation"
         },
         {
           "command": "fileListExtension.display.quickSettings",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
+          "when": "view == workspaceExplorer",
           "group": "navigation"
         },
         {
           "command": "fileListExtension.display.cycleSortOrder",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
+          "when": "view == workspaceExplorer",
           "group": "1_display@1"
         },
         {
           "command": "fileListExtension.display.toggleViewMode",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
+          "when": "view == workspaceExplorer",
           "group": "1_display@2"
         },
         {
           "command": "fileListExtension.display.toggleHiddenFiles",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
+          "when": "view == workspaceExplorer",
           "group": "1_display@3"
         }
       ],
       "view/item/context": [
+
         {
           "command": "fileList.showInPanel",
           "when": "view == fileListExplorer && viewItem =~ /directory/",
           "group": "inline"
+        },
+        {
+          "command": "fileListExtension.contextMenu.copyPath",
+          "when": "view == fileListDetails",
+          "group": "0_top@1"
         },
         {
           "command": "fileList.showInPanel",
@@ -326,53 +332,43 @@
         },
         {
           "command": "fileListExtension.contextMenu.copy",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
+          "when": "view == workspaceExplorer",
           "group": "1_clipboard@1"
         },
         {
           "command": "fileListExtension.contextMenu.cut",
-          "when": "(view == workspaceExplorer || view == fileListExplorer || view == fileListDetails) && viewItem !~ /readonly/",
+          "when": "view == workspaceExplorer && viewItem !~ /readonly/",
           "group": "1_clipboard@2"
         },
         {
           "command": "fileListExtension.contextMenu.paste",
-          "when": "(view == workspaceExplorer || view == fileListExplorer || view == fileListDetails) && viewItem =~ /directory/ && viewItem !~ /readonly/",
+          "when": "view == workspaceExplorer && viewItem =~ /directory/ && viewItem !~ /readonly/",
           "group": "1_clipboard@3"
         },
         {
           "command": "fileListExtension.contextMenu.delete",
-          "when": "(view == workspaceExplorer || view == fileListExplorer || view == fileListDetails) && viewItem !~ /readonly/",
+          "when": "view == workspaceExplorer && viewItem !~ /readonly/",
           "group": "2_modification@1"
         },
         {
           "command": "fileListExtension.contextMenu.rename",
-          "when": "(view == workspaceExplorer || view == fileListExplorer || view == fileListDetails) && viewItem !~ /readonly/",
+          "when": "view == workspaceExplorer && viewItem !~ /readonly/",
           "group": "2_modification@2"
         },
         {
           "command": "fileListExtension.contextMenu.newFile",
-          "when": "(view == workspaceExplorer || view == fileListExplorer || view == fileListDetails) && viewItem =~ /directory/ && viewItem !~ /readonly/",
+          "when": "view == workspaceExplorer && viewItem =~ /directory/ && viewItem !~ /readonly/",
           "group": "3_creation@1"
         },
         {
           "command": "fileListExtension.contextMenu.newFolder",
-          "when": "(view == workspaceExplorer || view == fileListExplorer || view == fileListDetails) && viewItem =~ /directory/ && viewItem !~ /readonly/",
+          "when": "view == workspaceExplorer && viewItem =~ /directory/ && viewItem !~ /readonly/",
           "group": "3_creation@2"
         },
         {
           "command": "fileListExtension.contextMenu.refresh",
-          "when": "(view == workspaceExplorer || view == fileListExplorer || view == fileListDetails) && viewItem =~ /directory/",
+          "when": "view == workspaceExplorer && viewItem =~ /directory/",
           "group": "4_utility@1"
-        },
-        {
-          "command": "fileListExtension.contextMenu.reveal",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
-          "group": "4_utility@2"
-        },
-        {
-          "command": "fileListExtension.contextMenu.copyPath",
-          "when": "view == workspaceExplorer || view == fileListExplorer || view == fileListDetails",
-          "group": "4_utility@3"
         }
       ]
     },
@@ -532,6 +528,9 @@
         "default": true,
         "description": "アクティブなファイルを自動的にエクスプローラーで表示する"
       },
+
+
+
       "fileListExtension.explorer.maxFilesPerFolder": {
         "type": "number",
         "default": 1000,
