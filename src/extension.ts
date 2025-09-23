@@ -1628,6 +1628,108 @@ class WorkspaceExplorerProvider implements vscode.TreeDataProvider<FileItem> {
         return this.itemCache.get(filePath);
     }
 
+    setTreeView(treeView: vscode.TreeView<FileItem>): void {
+        this.treeView = treeView;
+    }
+
+    updateTitle(editor: vscode.TextEditor | undefined): void {
+        if (this.treeView) {
+            if (editor) {
+                const fileName = path.basename(editor.document.fileName);
+                this.treeView.title = `エクスプローラー - ${fileName}`;
+            } else {
+                this.treeView.title = `エクスプローラー`;
+            }
+        }
+    }
+
+    async revealActiveFile(editor: vscode.TextEditor | undefined): Promise<void> {
+        if (!this.treeView || !editor) {
+            return;
+        }
+
+        const filePath = editor.document.fileName;
+
+        // ワークスペース内のファイルかチェック
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            return;
+        }
+
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+
+        // ファイルがワークスペース内にあることを確認
+        if (!filePath.startsWith(workspaceRoot)) {
+            return;
+        }
+
+        try {
+            // ファイルに対応するFileItemを取得または作成
+            const fileItem = await this.findOrCreateFileItem(filePath);
+
+            if (fileItem) {
+                try {
+                    // ファイルを表示して選択（親フォルダも自動展開される）
+                    // focus: falseでTreeViewにフォーカスを移さない
+                    await this.treeView.reveal(fileItem, {
+                        select: true,      // アイテムを選択状態にする
+                        focus: false,      // TreeViewにフォーカスを移さない（エディタのフォーカスを保持）
+                        expand: 1          // 最小限の展開のみ行う
+                    });
+                } catch (revealError) {
+                    // reveal中のエラーは無視（フォーカスを奪わないための保護）
+                    console.log('Reveal failed gracefully:', revealError);
+                }
+            }
+        } catch (error) {
+            console.log('ファイルの選択に失敗しました:', error);
+        }
+    }
+
+    private async findOrCreateFileItem(filePath: string): Promise<FileItem | undefined> {
+        // キャッシュから検索
+        if (this.itemCache.has(filePath)) {
+            return this.itemCache.get(filePath);
+        }
+
+        // パスの各階層を構築
+        const workspaceRoot = vscode.workspace.workspaceFolders![0].uri.fsPath;
+        const relativePath = path.relative(workspaceRoot, filePath);
+        const pathParts = relativePath.split(path.sep);
+
+        let currentPath = workspaceRoot;
+        let parentItem: FileItem | undefined;
+
+        // ルートから順番に各階層のアイテムを取得または作成
+        for (let i = 0; i <= pathParts.length; i++) {
+            if (i === 0) {
+                // ルートアイテムを取得
+                const children = await this.getChildren();
+                if (children.length > 0) {
+                    parentItem = children[0];
+                    this.itemCache.set(currentPath, parentItem);
+                }
+            } else {
+                const part = pathParts[i - 1];
+                currentPath = path.join(currentPath, part);
+
+                // 既にキャッシュにある場合はそれを使用
+                if (this.itemCache.has(currentPath)) {
+                    parentItem = this.itemCache.get(currentPath);
+                } else if (parentItem) {
+                    // 親要素の子要素を取得
+                    const children = await this.getChildren(parentItem);
+                    const childItem = children.find(child => child.filePath === currentPath);
+                    if (childItem) {
+                        this.itemCache.set(currentPath, childItem);
+                        parentItem = childItem;
+                    }
+                }
+            }
+        }
+
+        return this.itemCache.get(filePath);
+    }
+
     refresh(): void {
         this.itemCache.clear();  // キャッシュをクリア
         this._onDidChangeTreeData.fire();
