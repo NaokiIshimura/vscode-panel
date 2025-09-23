@@ -109,6 +109,18 @@ code --install-extension releases/file-list-extension-0.0.1.vsix
    ```
 3. VS Codeを再起動
 
+## アンインストール
+
+### コマンドラインから
+```bash
+code --uninstall-extension file-list-extension
+```
+
+### VSCode内から
+1. 拡張機能サイドバーを開く（`Ctrl+Shift+X` / `Cmd+Shift+X`）
+2. インストール済みの拡張機能から「File List」を検索
+3. アンインストールボタンをクリック
+
 ## 要件
 
 - VSCode 1.74.0 以上
