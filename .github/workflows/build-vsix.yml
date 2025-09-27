@@ -24,10 +24,17 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
+
+    - name: Clean npm cache
+      run: npm cache clean --force
+
+    - name: Remove node_modules and package-lock
+      run: |
+        rm -rf node_modules
+        rm -f package-lock.json
 
     - name: Install dependencies
-      run: npm ci
+      run: npm install
 
     - name: Compile TypeScript
       run: npm run compile
@@ -48,7 +55,7 @@ jobs:
     - name: Package extension with npx
       run: |
         echo "Creating VSIX package..."
-        npx --yes @vscode/vsce@latest package --out releases/
+        npx --yes @vscode/vsce@latest package --out releases/ --allow-missing-repository --no-dependencies
         echo "Package created successfully"
         ls -la releases/
 
