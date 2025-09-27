@@ -142,13 +142,13 @@ npm run watch
 1. [GitHubのReleasesページ](https://github.com/NaokiIshimura/vscode-panel/releases)から最新のVSIXファイルをダウンロード
 2. コマンドラインからインストール:
    ```bash
-   code --install-extension file-list-extension-*.vsix
+   code --install-extension file-list-extension-0.0.1.vsix
    ```
 3. VS Codeを再起動
 
 #### ローカルビルド版を使用する場合:
 ```bash
-# releasesディレクトリから直接インストール
+# releasesディレクトリから直接インストール（バージョン0.0.1）
 code --install-extension releases/file-list-extension-0.0.1.vsix
 ```
 
@@ -163,7 +163,7 @@ code --install-extension releases/file-list-extension-0.0.1.vsix
    ```
 3. 生成されたVSIXファイルをインストール:
    ```bash
-   code --install-extension releases/file-list-extension-*.vsix
+   code --install-extension releases/file-list-extension-0.0.1.vsix
    ```
 4. VS Codeを再起動
 
