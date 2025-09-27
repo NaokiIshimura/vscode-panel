@@ -89,6 +89,11 @@
         "icon": "$(new-folder)"
       },
       {
+        "command": "fileList.addFile",
+        "title": "ファイルを追加",
+        "icon": "$(new-file)"
+      },
+      {
         "command": "fileList.copyRelativePath",
         "title": "相対パスをコピー",
         "icon": "$(copy)"
@@ -136,6 +141,16 @@
           "group": "navigation"
         },
         {
+          "command": "fileList.addFile",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.addFolder",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
           "command": "fileList.setRelativePath",
           "when": "view == fileListExplorer",
           "group": "navigation"
@@ -171,6 +186,16 @@
           "command": "fileList.showInPanel",
           "when": "view == fileListExplorer && viewItem == directory",
           "group": "inline"
+        },
+        {
+          "command": "fileList.addFile",
+          "when": "view == fileListExplorer && viewItem == directory",
+          "group": "2_workspace"
+        },
+        {
+          "command": "fileList.addFolder",
+          "when": "view == fileListExplorer && viewItem == directory",
+          "group": "2_workspace@2"
         },
         {
           "command": "fileList.showInPanel",
