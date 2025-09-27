@@ -180,7 +180,6 @@
           "when": "view == fileListExplorer",
           "group": "navigation@4"
         },
-
         {
           "command": "fileList.createMemo",
           "when": "view == fileListDetails",
