@@ -70,8 +70,11 @@ jobs:
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
       id: changelog
       run: |
-        CHANGELOG=$(git log --oneline --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD 2>/dev/null || echo "- Initial release")
-        echo "CHANGELOG=${CHANGELOG}" >> $GITHUB_OUTPUT
+        {
+          echo "CHANGELOG<<CHANGELOG_EOF"
+          git log --oneline --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD 2>/dev/null || echo "- Initial release"
+          echo "CHANGELOG_EOF"
+        } >> $GITHUB_OUTPUT
 
     - name: Create Release (on master push)
       if: github.event_name == 'push' && github.ref == 'refs/heads/master'
