@@ -181,19 +181,29 @@
         },
 
         {
-          "command": "fileList.goToParent",
-          "when": "view == fileListDetails",
-          "group": "navigation"
-        },
-        {
           "command": "fileList.createMemo",
           "when": "view == fileListDetails",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "fileList.createFolder",
           "when": "view == fileListDetails",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "fileList.goToParent",
+          "when": "view == fileListDetails",
+          "group": "navigation@3"
+        },
+        {
+          "command": "fileList.refresh",
+          "when": "view == fileListDetails",
+          "group": "navigation@4"
+        },
+        {
+          "command": "fileList.selectFolder",
+          "when": "view == fileListDetails",
+          "group": "navigation@5"
         },
         {
           "command": "fileList.refreshGitChanges",
