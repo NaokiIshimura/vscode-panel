@@ -150,6 +150,14 @@ async function setupClaudeFolder(workspaceRoot: string): Promise<void> {
 export function activate(context: vscode.ExtensionContext) {
     console.log('File List Extension が有効化されました');
 
+    // ステータスバーアイテムを作成
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBarItem.text = "$(gear) File List設定";
+    statusBarItem.tooltip = "File List拡張機能のワークスペース設定";
+    statusBarItem.command = "fileList.setupWorkspace";
+    statusBarItem.show();
+    context.subscriptions.push(statusBarItem);
+
     // TreeDataProviderを作成
     const workspaceExplorerProvider = new WorkspaceExplorerProvider();
     const fileListProvider = new FileListProvider();
