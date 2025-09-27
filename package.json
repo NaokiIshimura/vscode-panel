@@ -271,7 +271,11 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --out releases/"
+    "package": "vsce package --out releases/",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
+    "build:release": "npm run compile && npm run package"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",

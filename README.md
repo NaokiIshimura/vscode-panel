@@ -138,7 +138,15 @@ npm run watch
 
 ### 方法2: VSIXパッケージからインストール
 
-#### 最新のリリースを使用する場合:
+#### GitHub Releasesから最新版を使用する場合（推奨）:
+1. [GitHubのReleasesページ](https://github.com/NaokiIshimura/vscode-panel/releases)から最新のVSIXファイルをダウンロード
+2. コマンドラインからインストール:
+   ```bash
+   code --install-extension file-list-extension-*.vsix
+   ```
+3. VS Codeを再起動
+
+#### ローカルビルド版を使用する場合:
 ```bash
 # releasesディレクトリから直接インストール
 code --install-extension releases/file-list-extension-0.0.1.vsix
@@ -155,9 +163,31 @@ code --install-extension releases/file-list-extension-0.0.1.vsix
    ```
 3. 生成されたVSIXファイルをインストール:
    ```bash
-   code --install-extension releases/file-list-extension-0.0.1.vsix
+   code --install-extension releases/file-list-extension-*.vsix
    ```
-3. VS Codeを再起動
+4. VS Codeを再起動
+
+## 自動ビルド・リリース
+
+このプロジェクトではGitHub Actionsを使用した自動ビルドとリリースを行っています。
+
+### 自動ビルドの仕組み
+- **トリガー**: masterブランチへのプッシュ時
+- **ビルドプロセス**: 
+  1. TypeScriptコンパイル
+  2. VSIXパッケージの自動作成
+  3. GitHub Releasesへの自動アップロード
+  4. リポジトリ内 `releases/` ディレクトリの更新
+
+### バージョン管理
+package.jsonのversionフィールドに基づいてリリースタグが作成されます。
+
+```bash
+# バージョンアップのスクリプト
+npm run version:patch   # 0.0.1 → 0.0.2
+npm run version:minor   # 0.0.1 → 0.1.0  
+npm run version:major   # 0.0.1 → 1.0.0
+```
 
 ## アンインストール
 
