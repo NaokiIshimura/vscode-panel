@@ -156,29 +156,24 @@
     "menus": {
       "view/title": [
         {
-          "command": "fileList.addFile",
+          "command": "fileList.addFolder",
           "when": "view == fileListExplorer",
           "group": "navigation@1"
         },
         {
-          "command": "fileList.addFolder",
+          "command": "fileList.goToParent",
           "when": "view == fileListExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "fileList.goToParent",
+          "command": "fileList.refresh",
           "when": "view == fileListExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "fileList.refresh",
-          "when": "view == fileListExplorer",
-          "group": "navigation@4"
-        },
-        {
           "command": "fileList.selectFolder",
           "when": "view == fileListExplorer",
-          "group": "navigation@5"
+          "group": "navigation@4"
         },
 
         {
