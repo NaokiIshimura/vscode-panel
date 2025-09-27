@@ -200,6 +200,11 @@
           "command": "fileList.refreshGitChanges",
           "when": "view == gitChanges",
           "group": "navigation"
+        },
+        {
+          "command": "fileList.setupWorkspace",
+          "when": "view == workspaceExplorer",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -246,7 +251,7 @@
         {
           "command": "fileList.copyRelativePath",
           "when": "view == fileListDetails",
-          "group": "1_navigation@1"
+          "group": "1_copy"
         }
       ]
     }
