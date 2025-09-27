@@ -51,6 +51,11 @@
         "icon": "$(settings-gear)"
       },
       {
+        "command": "fileList.setupWorkspace",
+        "title": "ワークスペース設定",
+        "icon": "$(gear)"
+      },
+      {
         "command": "fileList.openGitFile",
         "title": "Gitファイルを開く"
       },
@@ -151,12 +156,7 @@
           "group": "navigation"
         },
         {
-          "command": "fileList.setRelativePath",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
-        {
-          "command": "fileList.openSettings",
+          "command": "fileList.setupWorkspace",
           "when": "view == fileListExplorer",
           "group": "navigation"
         },
