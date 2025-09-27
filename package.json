@@ -146,6 +146,11 @@
           "group": "navigation"
         },
         {
+          "command": "fileList.goToParent",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
           "command": "fileList.addFile",
           "when": "view == fileListExplorer",
           "group": "navigation"

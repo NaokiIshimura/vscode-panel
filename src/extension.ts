@@ -338,7 +338,24 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 親フォルダへ移動するコマンドを登録
     const goToParentCommand = vscode.commands.registerCommand('fileList.goToParent', async () => {
-        fileDetailsProvider.goToParentFolder();
+        // フォルダツリーviewの親フォルダへ移動
+        const currentPath = fileListProvider.getRootPath();
+        if (currentPath) {
+            const parentPath = path.dirname(currentPath);
+            
+            // プロジェクトルートより上には移動しない
+            const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+            if (workspaceRoot && parentPath.startsWith(workspaceRoot) && parentPath !== currentPath) {
+                fileListProvider.setRootPath(parentPath);
+                // ファイル一覧ペインも同期
+                fileDetailsProvider.setRootPath(parentPath);
+            } else {
+                vscode.window.showInformationMessage('これ以上上のフォルダはありません');
+            }
+        } else {
+            // フォルダツリーにパスが設定されていない場合は、ファイル一覧ペインの親フォルダへ移動
+            fileDetailsProvider.goToParentFolder();
+        }
     });
 
     // 相対パス設定コマンドを登録
