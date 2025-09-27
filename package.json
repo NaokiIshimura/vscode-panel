@@ -154,7 +154,7 @@
         {
           "id": "fileListView",
           "title": "File List",
-          "icon": "$(note)"
+          "icon": "images/nacn.png"
         }
       ]
     },
