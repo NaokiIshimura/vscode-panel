@@ -1,0 +1,31 @@
+# Source files
+src/
+.vscode/
+.github/
+
+# Build artifacts
+out_test/
+*.log
+releases/
+
+# Node.js
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Development files
+tsconfig.json
+CLAUDE.md
+
+# Test files
+test/
+.nyc_output/
+coverage/
