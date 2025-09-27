@@ -161,12 +161,12 @@
           "group": "navigation@1"
         },
         {
-          "command": "fileList.goToParent",
+          "command": "fileList.refresh",
           "when": "view == fileListExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "fileList.refresh",
+          "command": "fileList.goToParent",
           "when": "view == fileListExplorer",
           "group": "navigation@3"
         },
@@ -187,23 +187,18 @@
           "group": "navigation@2"
         },
         {
-          "command": "fileList.goToParent",
+          "command": "fileList.refresh",
           "when": "view == fileListDetails",
           "group": "navigation@3"
         },
         {
-          "command": "fileList.refresh",
+          "command": "fileList.goToParent",
           "when": "view == fileListDetails",
           "group": "navigation@4"
         },
         {
           "command": "fileList.refreshGitChanges",
           "when": "view == gitChanges",
-          "group": "navigation"
-        },
-        {
-          "command": "fileList.setupWorkspace",
-          "when": "view == workspaceExplorer",
           "group": "navigation"
         }
       ],
