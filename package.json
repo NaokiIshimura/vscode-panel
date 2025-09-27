@@ -154,7 +154,7 @@
         {
           "id": "fileListView",
           "title": "File List",
-          "icon": "images/activity-bar-icon.svg"
+          "icon": "$(note)"
         }
       ]
     },
