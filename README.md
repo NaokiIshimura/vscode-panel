@@ -8,6 +8,7 @@
 - **ファイル一覧ペイン**: 選択したフォルダ内のファイルとサブフォルダを表示
 - **相対パス設定**: ワークスペースルートからの相対パスでデフォルトフォルダを指定
 - **親フォルダへ移動**: ファイル一覧ペインから上位フォルダへ簡単移動
+- **相対パスコピー**: ファイルを右クリックしてワークスペースからの相対パスをクリップボードにコピー
 - **ファイル・フォルダ作成**: 新しいファイルやフォルダを簡単に作成
 - **テンプレート機能**: `templates/file.md`でファイル作成時の初期内容をカスタマイズ
 
@@ -17,6 +18,7 @@
 1. アクティビティバーの「File List」アイコンをクリック
 2. フォルダツリーペインでフォルダを選択
 3. ファイル一覧ペインでファイルとフォルダを確認
+4. ファイルを右クリック → 「相対パスをコピー」でワークスペースからの相対パスをクリップボードにコピー
 
 ### 相対パスの設定
 
@@ -142,13 +144,13 @@ npm run watch
 1. [GitHubのReleasesページ](https://github.com/NaokiIshimura/vscode-panel/releases)から最新のVSIXファイルをダウンロード
 2. コマンドラインからインストール:
    ```bash
-   code --install-extension file-list-extension-*.vsix
+   code --install-extension file-list-extension-0.0.1.vsix
    ```
 3. VS Codeを再起動
 
 #### ローカルビルド版を使用する場合:
 ```bash
-# releasesディレクトリから直接インストール
+# releasesディレクトリから直接インストール（バージョン0.0.1）
 code --install-extension releases/file-list-extension-0.0.1.vsix
 ```
 
@@ -163,7 +165,7 @@ code --install-extension releases/file-list-extension-0.0.1.vsix
    ```
 3. 生成されたVSIXファイルをインストール:
    ```bash
-   code --install-extension releases/file-list-extension-*.vsix
+   code --install-extension releases/file-list-extension-0.0.1.vsix
    ```
 4. VS Codeを再起動
 
