@@ -23,7 +23,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
 
     - name: Install dependencies
@@ -32,15 +32,25 @@ jobs:
     - name: Compile TypeScript
       run: npm run compile
 
-    - name: Install VSCE
-      run: npm install -g @vscode/vsce
-
     - name: Get package version
       id: package-version
       run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-    - name: Package extension
-      run: npm run package
+    - name: Debug - Show Node and npm versions
+      run: |
+        node --version
+        npm --version
+        ls -la
+
+    - name: Create releases directory
+      run: mkdir -p releases
+
+    - name: Package extension with npx
+      run: |
+        echo "Creating VSIX package..."
+        npx --yes @vscode/vsce@latest package --out releases/
+        echo "Package created successfully"
+        ls -la releases/
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v4
