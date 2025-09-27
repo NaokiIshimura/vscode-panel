@@ -56,6 +56,21 @@
         "icon": "$(gear)"
       },
       {
+        "command": "fileList.setupSettings",
+        "title": "settings.jsonを作成/編集",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "fileList.setupTemplate",
+        "title": "テンプレートをカスタマイズ",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "fileList.setupClaude",
+        "title": ".claudeフォルダを設定",
+        "icon": "$(folder)"
+      },
+      {
         "command": "fileList.openGitFile",
         "title": "Gitファイルを開く"
       },
@@ -106,6 +121,10 @@
     ],
     "views": {
       "fileListView": [
+        {
+          "id": "workspaceSettings",
+          "name": "ワークスペース設定"
+        },
         {
           "id": "workspaceExplorer",
           "name": "エクスプローラー"

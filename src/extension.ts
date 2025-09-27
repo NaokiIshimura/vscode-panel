@@ -159,6 +159,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(statusBarItem);
 
     // TreeDataProviderを作成
+    const workspaceSettingsProvider = new WorkspaceSettingsProvider();
     const workspaceExplorerProvider = new WorkspaceExplorerProvider();
     const fileListProvider = new FileListProvider();
     const fileDetailsProvider = new FileDetailsProvider();
@@ -213,6 +214,11 @@ export function activate(context: vscode.ExtensionContext) {
     };
 
     // ビューを登録
+    const workspaceSettingsView = vscode.window.createTreeView('workspaceSettings', {
+        treeDataProvider: workspaceSettingsProvider,
+        showCollapseAll: false
+    });
+
     const workspaceView = vscode.window.createTreeView('workspaceExplorer', {
         treeDataProvider: workspaceExplorerProvider,
         showCollapseAll: true
@@ -511,6 +517,34 @@ export function activate(context: vscode.ExtensionContext) {
                 await setupClaudeFolder(workspaceRoot);
                 break;
         }
+    });
+
+    // 個別の設定コマンドを登録
+    const setupSettingsCommand = vscode.commands.registerCommand('fileList.setupSettings', async () => {
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('ワークスペースが開かれていません');
+            return;
+        }
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        await setupSettingsJson(workspaceRoot);
+    });
+
+    const setupTemplateCommand = vscode.commands.registerCommand('fileList.setupTemplate', async () => {
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('ワークスペースが開かれていません');
+            return;
+        }
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        await setupTemplate(workspaceRoot);
+    });
+
+    const setupClaudeCommand = vscode.commands.registerCommand('fileList.setupClaude', async () => {
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+            vscode.window.showErrorMessage('ワークスペースが開かれていません');
+            return;
+        }
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        await setupClaudeFolder(workspaceRoot);
     });
 
     // Gitファイルを開くコマンドを登録
@@ -909,7 +943,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage(`相対パスをコピーしました: ${relativePath}`);
     });
 
-    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, setupWorkspaceCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand, createFolderCommand, renameCommand, deleteCommand, addFileCommand, addFolderCommand, copyRelativePathCommand);
+    context.subscriptions.push(selectFolderCommand, refreshCommand, showInPanelCommand, openFolderCommand, goToParentCommand, setRelativePathCommand, openSettingsCommand, setupWorkspaceCommand, setupSettingsCommand, setupTemplateCommand, setupClaudeCommand, openGitFileCommand, showGitDiffCommand, refreshGitChangesCommand, createMemoCommand, createFolderCommand, renameCommand, deleteCommand, addFileCommand, addFolderCommand, copyRelativePathCommand);
 
     // プロバイダーのリソースクリーンアップを登録
     context.subscriptions.push({
@@ -2082,6 +2116,74 @@ class GitHeadContentProvider implements vscode.TextDocumentContentProvider {
 
     provideTextDocumentContent(uri: vscode.Uri): string {
         return this.content;
+    }
+}
+
+// ワークスペース設定アイテムクラス
+class WorkspaceSettingItem extends vscode.TreeItem {
+    constructor(
+        public readonly label: string,
+        public readonly description: string,
+        public readonly command: vscode.Command,
+        public readonly iconPath: vscode.ThemeIcon
+    ) {
+        super(label, vscode.TreeItemCollapsibleState.None);
+        this.description = description;
+        this.command = command;
+        this.iconPath = iconPath;
+        this.tooltip = description;
+    }
+}
+
+// ワークスペース設定プロバイダー
+class WorkspaceSettingsProvider implements vscode.TreeDataProvider<WorkspaceSettingItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<WorkspaceSettingItem | undefined | null | void> = new vscode.EventEmitter<WorkspaceSettingItem | undefined | null | void>();
+    readonly onDidChangeTreeData: vscode.Event<WorkspaceSettingItem | undefined | null | void> = this._onDidChangeTreeData.event;
+
+    constructor() {}
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire();
+    }
+
+    getTreeItem(element: WorkspaceSettingItem): vscode.TreeItem {
+        return element;
+    }
+
+    getChildren(element?: WorkspaceSettingItem): Thenable<WorkspaceSettingItem[]> {
+        if (!element) {
+            // ルートレベルの設定項目を返す
+            return Promise.resolve([
+                new WorkspaceSettingItem(
+                    'settings.jsonを作成/編集',
+                    'ワークスペース設定ファイルを作成または編集',
+                    {
+                        command: 'fileList.setupSettings',
+                        title: 'settings.jsonを作成/編集'
+                    },
+                    new vscode.ThemeIcon('gear')
+                ),
+                new WorkspaceSettingItem(
+                    'テンプレートをカスタマイズ',
+                    'ファイル作成時のテンプレートをカスタマイズ',
+                    {
+                        command: 'fileList.setupTemplate',
+                        title: 'テンプレートをカスタマイズ'
+                    },
+                    new vscode.ThemeIcon('file-text')
+                ),
+                new WorkspaceSettingItem(
+                    '.claudeフォルダを設定',
+                    'defaultRelativePathを.claudeに設定',
+                    {
+                        command: 'fileList.setupClaude',
+                        title: '.claudeフォルダを設定'
+                    },
+                    new vscode.ThemeIcon('folder')
+                )
+            ]);
+        }
+        return Promise.resolve([]);
     }
 }
 
