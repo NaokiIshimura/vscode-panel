@@ -51,6 +51,26 @@
         "icon": "$(settings-gear)"
       },
       {
+        "command": "fileList.setupWorkspace",
+        "title": "ワークスペース設定",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "fileList.setupSettings",
+        "title": "settings.jsonを作成/編集",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "fileList.setupTemplate",
+        "title": "テンプレートをカスタマイズ",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "fileList.setupClaude",
+        "title": ".claudeフォルダを設定",
+        "icon": "$(folder)"
+      },
+      {
         "command": "fileList.openGitFile",
         "title": "Gitファイルを開く"
       },
@@ -102,6 +122,10 @@
     "views": {
       "fileListView": [
         {
+          "id": "workspaceSettings",
+          "name": "ワークスペース設定"
+        },
+        {
           "id": "workspaceExplorer",
           "name": "エクスプローラー"
         },
@@ -141,6 +165,11 @@
           "group": "navigation"
         },
         {
+          "command": "fileList.goToParent",
+          "when": "view == fileListExplorer",
+          "group": "navigation"
+        },
+        {
           "command": "fileList.addFile",
           "when": "view == fileListExplorer",
           "group": "navigation"
@@ -150,16 +179,7 @@
           "when": "view == fileListExplorer",
           "group": "navigation"
         },
-        {
-          "command": "fileList.setRelativePath",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
-        {
-          "command": "fileList.openSettings",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
+
         {
           "command": "fileList.goToParent",
           "when": "view == fileListDetails",
@@ -178,6 +198,11 @@
         {
           "command": "fileList.refreshGitChanges",
           "when": "view == gitChanges",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.setupWorkspace",
+          "when": "view == workspaceExplorer",
           "group": "navigation"
         }
       ],
