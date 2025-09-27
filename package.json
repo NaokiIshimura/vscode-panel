@@ -4,6 +4,7 @@
   "description": "指定したディレクトリ内のファイルを一覧表示するVSCode拡張機能",
   "version": "0.0.1",
   "publisher": "nacn",
+  "icon": "images/nacn.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/NaokiIshimura/vscode-panel.git"
@@ -179,7 +180,6 @@
           "when": "view == fileListExplorer",
           "group": "navigation@4"
         },
-
         {
           "command": "fileList.createMemo",
           "when": "view == fileListDetails",
