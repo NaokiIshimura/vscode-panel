@@ -2164,15 +2164,6 @@ class WorkspaceSettingsProvider implements vscode.TreeDataProvider<WorkspaceSett
                     new vscode.ThemeIcon('gear')
                 ),
                 new WorkspaceSettingItem(
-                    'テンプレートをカスタマイズ',
-                    'ファイル作成時のテンプレートをカスタマイズ',
-                    {
-                        command: 'fileList.setupTemplate',
-                        title: 'テンプレートをカスタマイズ'
-                    },
-                    new vscode.ThemeIcon('file-text')
-                ),
-                new WorkspaceSettingItem(
                     '.claudeフォルダを設定',
                     'defaultRelativePathを.claudeに設定',
                     {
@@ -2180,6 +2171,15 @@ class WorkspaceSettingsProvider implements vscode.TreeDataProvider<WorkspaceSett
                         title: '.claudeフォルダを設定'
                     },
                     new vscode.ThemeIcon('folder')
+                ),
+                new WorkspaceSettingItem(
+                    'テンプレートをカスタマイズ',
+                    'ファイル作成時のテンプレートをカスタマイズ',
+                    {
+                        command: 'fileList.setupTemplate',
+                        title: 'テンプレートをカスタマイズ'
+                    },
+                    new vscode.ThemeIcon('file-text')
                 )
             ]);
         }
