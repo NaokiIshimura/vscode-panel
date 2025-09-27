@@ -123,7 +123,8 @@
       "fileListView": [
         {
           "id": "workspaceSettings",
-          "name": "ワークスペース設定"
+          "name": "ワークスペース設定",
+          "visibility": "collapsed"
         },
         {
           "id": "workspaceExplorer",
@@ -199,11 +200,6 @@
           "command": "fileList.refresh",
           "when": "view == fileListDetails",
           "group": "navigation@4"
-        },
-        {
-          "command": "fileList.selectFolder",
-          "when": "view == fileListDetails",
-          "group": "navigation@5"
         },
         {
           "command": "fileList.refreshGitChanges",
