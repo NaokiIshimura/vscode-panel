@@ -4,6 +4,10 @@
   "description": "指定したディレクトリ内のファイルを一覧表示するVSCode拡張機能",
   "version": "0.0.1",
   "publisher": "nacn",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NaokiIshimura/vscode-panel.git"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -123,7 +127,8 @@
       "fileListView": [
         {
           "id": "workspaceSettings",
-          "name": "ワークスペース設定"
+          "name": "ワークスペース設定",
+          "visibility": "collapsed"
         },
         {
           "id": "workspaceExplorer",
@@ -155,45 +160,45 @@
     "menus": {
       "view/title": [
         {
-          "command": "fileList.selectFolder",
+          "command": "fileList.addFolder",
           "when": "view == fileListExplorer",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "fileList.refresh",
           "when": "view == fileListExplorer",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "fileList.goToParent",
           "when": "view == fileListExplorer",
-          "group": "navigation"
+          "group": "navigation@3"
         },
         {
-          "command": "fileList.addFile",
+          "command": "fileList.selectFolder",
           "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
-        {
-          "command": "fileList.addFolder",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
+          "group": "navigation@4"
         },
 
         {
-          "command": "fileList.goToParent",
-          "when": "view == fileListDetails",
-          "group": "navigation"
-        },
-        {
           "command": "fileList.createMemo",
           "when": "view == fileListDetails",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "fileList.createFolder",
           "when": "view == fileListDetails",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "fileList.refresh",
+          "when": "view == fileListDetails",
+          "group": "navigation@3"
+        },
+        {
+          "command": "fileList.goToParent",
+          "when": "view == fileListDetails",
+          "group": "navigation@4"
         },
         {
           "command": "fileList.refreshGitChanges",
@@ -250,7 +255,7 @@
         {
           "command": "fileList.copyRelativePath",
           "when": "view == fileListDetails",
-          "group": "1_navigation@1"
+          "group": "1_copy"
         }
       ]
     }
@@ -270,11 +275,16 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --out releases/"
+    "package": "npx vsce package --out releases/ --allow-missing-repository --no-dependencies",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version",
+    "build:release": "npm run compile && npm run package"
   },
   "devDependencies": {
     "@types/vscode": "^1.74.0",
     "@types/node": "16.x",
-    "typescript": "^4.9.4"
+    "typescript": "^4.9.4",
+    "@vscode/vsce": "^3.6.2"
   }
 }

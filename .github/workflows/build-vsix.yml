@@ -1,0 +1,122 @@
+name: Build and Release VSIX
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Clean npm cache
+      run: npm cache clean --force
+
+    - name: Remove node_modules and package-lock
+      run: |
+        rm -rf node_modules
+        rm -f package-lock.json
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Compile TypeScript
+      run: npm run compile
+
+    - name: Get package version
+      id: package-version
+      run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+    - name: Debug - Show Node and npm versions
+      run: |
+        node --version
+        npm --version
+        ls -la
+
+    - name: Create releases directory
+      run: mkdir -p releases
+
+    - name: Package extension with npx
+      run: |
+        echo "Creating VSIX package..."
+        npx --yes @vscode/vsce@latest package --out releases/ --allow-missing-repository --no-dependencies
+        echo "Package created successfully"
+        ls -la releases/
+
+    - name: Upload VSIX artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vsix-package-${{ steps.package-version.outputs.VERSION }}
+        path: releases/*.vsix
+        retention-days: 90
+
+    - name: Generate changelog
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      id: changelog
+      run: |
+        echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+        git log --oneline --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD >> $GITHUB_OUTPUT || echo "- Initial release" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Create Release (on master push)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.package-version.outputs.VERSION }}
+        name: File List Extension v${{ steps.package-version.outputs.VERSION }}
+        body: |
+          ## File List Extension v${{ steps.package-version.outputs.VERSION }}
+          
+          VSCode拡張機能の自動ビルドリリースです。
+          
+          ### インストール方法
+          ```bash
+          # ダウンロードしたVSIXファイルをインストール
+          code --install-extension file-list-extension-${{ steps.package-version.outputs.VERSION }}.vsix
+          ```
+          
+          ### 変更内容
+          ${{ steps.changelog.outputs.CHANGELOG }}
+          
+          ### 機能
+          - ワークスペース内のファイルとフォルダを効率的に閲覧
+          - 相対パス設定によるデフォルトフォルダ指定  
+          - ファイル・フォルダの作成・編集・削除
+          - 相対パスのコピー機能
+          - テンプレート機能
+          - ワークスペース設定の自動化
+          
+          ### 要件
+          - VSCode 1.74.0 以上
+        files: releases/*.vsix
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Commit updated VSIX (on master push)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      run: |
+        git config --local user.email "action@github.com" 
+        git config --local user.name "GitHub Action"
+        git add releases/
+        if ! git diff --staged --quiet; then
+          git commit -m "Auto-update VSIX package v${{ steps.package-version.outputs.VERSION }} [skip ci]"
+          git push
+        fi
