@@ -160,11 +160,7 @@
           "when": "view == fileListExplorer",
           "group": "navigation"
         },
-        {
-          "command": "fileList.setupWorkspace",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
+
         {
           "command": "fileList.goToParent",
           "when": "view == fileListDetails",
@@ -183,6 +179,11 @@
         {
           "command": "fileList.refreshGitChanges",
           "when": "view == gitChanges",
+          "group": "navigation"
+        },
+        {
+          "command": "fileList.setupWorkspace",
+          "when": "view == workspaceExplorer",
           "group": "navigation"
         }
       ],
