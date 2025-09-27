@@ -155,29 +155,29 @@
     "menus": {
       "view/title": [
         {
-          "command": "fileList.selectFolder",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
-        {
-          "command": "fileList.refresh",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
-        {
-          "command": "fileList.goToParent",
-          "when": "view == fileListExplorer",
-          "group": "navigation"
-        },
-        {
           "command": "fileList.addFile",
           "when": "view == fileListExplorer",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "command": "fileList.addFolder",
           "when": "view == fileListExplorer",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "command": "fileList.goToParent",
+          "when": "view == fileListExplorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "fileList.refresh",
+          "when": "view == fileListExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "fileList.selectFolder",
+          "when": "view == fileListExplorer",
+          "group": "navigation@5"
         },
 
         {
