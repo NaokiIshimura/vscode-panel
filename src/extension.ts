@@ -1702,15 +1702,35 @@ class GitChangesProvider implements vscode.TreeDataProvider<GitFileItem> {
             return [];
         }
 
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+
+        // 特定のGitFileItemの展開の場合（ディレクトリの場合）
+        if (element && element.isDirectory) {
+            try {
+                const files = await this.getFilesInDirectory(element.filePath);
+                return files.map(file => new GitFileItem(
+                    file.name,
+                    file.path,
+                    'File in changed directory',
+                    file.relativePath,
+                    file.isDirectory
+                ));
+            } catch (error) {
+                console.log('ディレクトリ内ファイルの取得に失敗しました:', error);
+                return [];
+            }
+        }
+
+        // ルートレベルの場合、Git変更を取得
         try {
-            const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
             const gitChanges = await this.getGitChanges(workspaceRoot);
-            
+
             return gitChanges.map(change => new GitFileItem(
                 path.basename(change.path),
                 change.path,
                 change.status,
-                change.relativePath
+                change.relativePath,
+                change.isDirectory
             ));
         } catch (error) {
             console.log('Git変更の取得に失敗しました:', error);
@@ -1774,10 +1794,21 @@ class GitChangesProvider implements vscode.TreeDataProvider<GitFileItem> {
                             console.log('FullPath:', JSON.stringify(fullPath));
                             console.log('Basename:', JSON.stringify(path.basename(fullPath)));
 
+                            // ファイル/ディレクトリの存在確認
+                            let isDirectory = false;
+                            try {
+                                const stat = fs.statSync(fullPath);
+                                isDirectory = stat.isDirectory();
+                            } catch (error) {
+                                // ファイルが削除されている場合は、パスから推測
+                                isDirectory = false;
+                            }
+
                             changes.push({
                                 path: fullPath,
                                 relativePath: relativePath,
-                            status: this.parseGitStatus(status)
+                                status: this.parseGitStatus(status),
+                                isDirectory: isDirectory
                             });
                         }
                     }
@@ -1803,6 +1834,44 @@ class GitChangesProvider implements vscode.TreeDataProvider<GitFileItem> {
         
         return 'Changed';
     }
+
+    private async getFilesInDirectory(dirPath: string): Promise<{name: string, path: string, relativePath: string, isDirectory: boolean}[]> {
+        const files: {name: string, path: string, relativePath: string, isDirectory: boolean}[] = [];
+
+        if (!vscode.workspace.workspaceFolders) {
+            return files;
+        }
+
+        const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
+
+        try {
+            const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+            for (const entry of entries) {
+                const fullPath = path.join(dirPath, entry.name);
+                const relativePath = path.relative(workspaceRoot, fullPath);
+
+                files.push({
+                    name: entry.name,
+                    path: fullPath,
+                    relativePath: relativePath,
+                    isDirectory: entry.isDirectory()
+                });
+            }
+
+            // ディレクトリを先に、その後ファイルを名前順でソート
+            files.sort((a, b) => {
+                if (a.isDirectory && !b.isDirectory) return -1;
+                if (!a.isDirectory && b.isDirectory) return 1;
+                return a.name.localeCompare(b.name);
+            });
+
+        } catch (error) {
+            console.log('ディレクトリの読み取りに失敗しました:', error);
+        }
+
+        return files;
+    }
 }
 
 // Git変更ファイル用TreeItem実装
@@ -1811,31 +1880,49 @@ class GitFileItem extends vscode.TreeItem {
         public readonly label: string,
         public readonly filePath: string,
         public readonly status: string,
-        public readonly relativePath: string
+        public readonly relativePath: string,
+        public readonly isDirectory: boolean = false
     ) {
-        super(label, vscode.TreeItemCollapsibleState.None);
+        super(label, isDirectory ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
         
         this.resourceUri = vscode.Uri.file(filePath);
-        this.contextValue = 'gitFile';
-        
+        this.contextValue = isDirectory ? 'gitDirectory' : 'gitFile';
+
         // ステータスに応じたアイコンを設定
-        this.iconPath = this.getStatusIcon(status);
-        
+        this.iconPath = this.getStatusIcon(status, isDirectory);
+
         // 説明にステータスと相対パスを表示
         this.description = `${status} • ${relativePath}`;
-        
+
         // ツールチップを設定
-        this.tooltip = `${relativePath}\nStatus: ${status}`;
-        
-        // クリックで差分を表示
-        this.command = {
-            command: 'fileList.showGitDiff',
-            title: 'Show Git Diff',
-            arguments: [this]
-        };
+        this.tooltip = `${relativePath}\nStatus: ${status}${isDirectory ? '\nType: Directory' : ''}`;
+
+        // ディレクトリでない場合のみクリックで差分を表示
+        if (!isDirectory) {
+            this.command = {
+                command: 'fileList.showGitDiff',
+                title: 'Show Git Diff',
+                arguments: [this]
+            };
+        }
     }
 
-    private getStatusIcon(status: string): vscode.ThemeIcon {
+    private getStatusIcon(status: string, isDirectory: boolean = false): vscode.ThemeIcon {
+        if (isDirectory) {
+            switch (status) {
+                case 'Added':
+                    return new vscode.ThemeIcon('folder', new vscode.ThemeColor('gitDecoration.addedResourceForeground'));
+                case 'Modified':
+                    return new vscode.ThemeIcon('folder', new vscode.ThemeColor('gitDecoration.modifiedResourceForeground'));
+                case 'Deleted':
+                    return new vscode.ThemeIcon('folder', new vscode.ThemeColor('gitDecoration.deletedResourceForeground'));
+                case 'Untracked':
+                    return new vscode.ThemeIcon('folder', new vscode.ThemeColor('gitDecoration.untrackedResourceForeground'));
+                default:
+                    return new vscode.ThemeIcon('folder');
+            }
+        }
+
         switch (status) {
             case 'Added':
                 return new vscode.ThemeIcon('diff-added');
@@ -1847,6 +1934,8 @@ class GitFileItem extends vscode.TreeItem {
                 return new vscode.ThemeIcon('question');
             case 'Renamed':
                 return new vscode.ThemeIcon('diff-renamed');
+            case 'File in changed directory':
+                return new vscode.ThemeIcon('file');
             default:
                 return new vscode.ThemeIcon('file');
         }
@@ -1858,6 +1947,7 @@ interface GitChange {
     path: string;
     relativePath: string;
     status: string;
+    isDirectory: boolean;
 }
 
 // ワークスペースエクスプローラープロバイダー
